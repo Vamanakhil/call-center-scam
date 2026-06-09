@@ -34,30 +34,186 @@ if (-not (Get-Variable -Name 'VictimData' -Scope Global -ErrorAction SilentlyCon
 }
 
 # ---------------------------------------------------------------------------
-# Helper: execute SQL via mysql.exe writing to a temp .sql file.
+# Helper: execute SQL via mysql.exe using a Process-based stdin pipe.
+# This avoids the broken "--execute=source" approach which does not reliably
+# read external .sql files. The SQL text is fed directly to mysql's stdin.
 # ---------------------------------------------------------------------------
 function Invoke-MySql {
     param(
         [string]$Sql,
-        [string]$Database  = '',
-        [string]$MysqlExe  = "$env:SystemDrive\xampp\mysql\bin\mysql.exe"
+        [string]$Database = '',
+        [string]$MysqlExe = "$env:SystemDrive\xampp\mysql\bin\mysql.exe"
     )
-
-    $tmpSql = [System.IO.Path]::GetTempFileName() + '.sql'
-    try {
-        $Sql | Set-Content -Path $tmpSql -Encoding UTF8
-        if ($Database) {
-            $result = & $MysqlExe -u root "--database=$Database" "--execute=source $tmpSql" 2>&1
-        } else {
-            $result = & $MysqlExe -u root "--execute=source $tmpSql" 2>&1
-        }
-        if ($LASTEXITCODE -ne 0) {
-            throw "MySQL error (exit $LASTEXITCODE): $result"
-        }
-        return $result
-    } finally {
-        Remove-Item $tmpSql -ErrorAction SilentlyContinue
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $MysqlExe
+    $psi.Arguments = if ($Database) { "-u root -D `"$Database`" --batch --silent" } else { "-u root --batch --silent" }
+    $psi.RedirectStandardInput  = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError  = $true
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow  = $true
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $proc.StandardInput.WriteLine($Sql)
+    $proc.StandardInput.Close()
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    if ($proc.ExitCode -ne 0) {
+        throw "MySQL error (exit $($proc.ExitCode)): $stderr"
     }
+    return $stdout
+}
+
+# ---------------------------------------------------------------------------
+# Helper: probe whether a MySQL instance is responding to ping.
+# ---------------------------------------------------------------------------
+function Test-MySqlAlive {
+    param([string]$MysqladminExe)
+    try {
+        $r = & $MysqladminExe -u root --connect-timeout=3 ping 2>&1
+        return ($r -match 'alive')
+    } catch { return $false }
+}
+
+# ---------------------------------------------------------------------------
+# Helper: bring up MySQL using a 3-tier strategy.
+#   Tier 0 : already alive (existing service or PATH instance) -> reuse
+#   Tier 1 : XAMPP MySQL as a Windows service (with data-dir init)
+#   Tier 2 : standalone mysqld.exe process (no service)
+#   Tier 3 : file-only fallback (returns $null)
+# Returns the path to mysql.exe if MySQL is available, $null otherwise.
+# ---------------------------------------------------------------------------
+function Start-LabMySQL {
+    param([string]$XamppDir)
+
+    $mysql      = "$XamppDir\mysql\bin\mysql.exe"
+    $mysqladmin = "$XamppDir\mysql\bin\mysqladmin.exe"
+    $mysqld     = "$XamppDir\mysql\bin\mysqld.exe"
+    $myIni      = "$XamppDir\mysql\bin\my.ini"
+    $dataDir    = "$XamppDir\mysql\data"
+    $svcName    = 'GR_MySQL_Lab'
+
+    # --- Tier 0: Is MySQL already alive? ---
+    Write-SetupLog "[CRM-SERVER] MySQL Tier 0: checking if MySQL already responding..."
+    if (Test-Path $mysqladmin) {
+        if (Test-MySqlAlive -MysqladminExe $mysqladmin) {
+            Write-SetupLog "[CRM-SERVER] MySQL already alive -- using existing instance"
+            return $mysql
+        }
+    }
+    # Also check if any mysql.exe is in PATH (PowerShell 5.1 compatible -- no null-conditional).
+    $mysqlCmd = Get-Command 'mysql.exe' -ErrorAction SilentlyContinue
+    $mysqlInPath = if ($mysqlCmd) { $mysqlCmd.Source } else { $null }
+    if ($mysqlInPath) {
+        $adminInPath = Join-Path (Split-Path $mysqlInPath) 'mysqladmin.exe'
+        if ((Test-Path $adminInPath) -and (Test-MySqlAlive -MysqladminExe $adminInPath)) {
+            Write-SetupLog "[CRM-SERVER] MySQL found in PATH and alive: $mysqlInPath"
+            return $mysqlInPath
+        }
+    }
+
+    # --- Tier 1: XAMPP MySQL ---
+    Write-SetupLog "[CRM-SERVER] MySQL Tier 1: XAMPP MySQL at $XamppDir..."
+    if (-not (Test-Path $mysql)) {
+        Write-SetupLog "[CRM-SERVER] XAMPP mysql.exe not found -- skipping Tier 1" 'WARN'
+    } else {
+        try {
+            # Stop + unregister any old conflicting service to avoid port conflicts.
+            @('GR_MySQL_Lab', 'MySQLForTraining', 'mysql', 'MySQL80', 'MySQL57') | ForEach-Object {
+                $svc = Get-Service -Name $_ -ErrorAction SilentlyContinue
+                if ($svc) {
+                    if ($svc.Status -eq 'Running') {
+                        Stop-Service -Name $_ -Force -ErrorAction SilentlyContinue
+                        Start-Sleep -Seconds 2
+                    }
+                    & $mysqld '--remove' $_ 2>$null | Out-Null
+                    Start-Sleep -Seconds 1
+                }
+            }
+
+            # Initialize data directory if this is a fresh install.
+            if (-not (Test-Path "$dataDir\ibdata1")) {
+                Write-SetupLog "[CRM-SERVER] Initializing MySQL data directory..."
+                $initArgs = @('--initialize-insecure', "--datadir=$dataDir")
+                if (Test-Path $myIni) { $initArgs += "--defaults-file=$myIni" }
+                $initProc = Start-Process -FilePath $mysqld -ArgumentList $initArgs -Wait -PassThru -NoNewWindow -ErrorAction Stop
+                if ($initProc.ExitCode -ne 0) { throw "mysqld --initialize-insecure failed (exit $($initProc.ExitCode))" }
+                Start-Sleep -Seconds 2
+                Write-SetupLog "[CRM-SERVER] Data directory initialized"
+            }
+
+            # Register as Windows service.
+            Write-SetupLog "[CRM-SERVER] Installing MySQL service '$svcName'..."
+            $installArgs = @('--install', $svcName)
+            if (Test-Path $myIni) { $installArgs += "--defaults-file=$myIni" }
+            & $mysqld @installArgs 2>$null | Out-Null
+            Start-Sleep -Seconds 2
+
+            # Start the service.
+            Write-SetupLog "[CRM-SERVER] Starting service '$svcName'..."
+            Start-Service -Name $svcName -ErrorAction Stop
+
+            # Wait up to 60s for MySQL to respond.
+            Write-SetupLog "[CRM-SERVER] Waiting for MySQL to accept connections (up to 60s)..."
+            $alive = $false
+            for ($i = 0; $i -lt 60; $i++) {
+                if (Test-MySqlAlive -MysqladminExe $mysqladmin) {
+                    $alive = $true
+                    break
+                }
+                Start-Sleep -Seconds 1
+            }
+            if ($alive) {
+                Write-SetupLog "[CRM-SERVER] MySQL Tier 1 alive -- XAMPP service running"
+                return $mysql
+            } else {
+                throw "MySQL service started but did not respond within 60 seconds"
+            }
+        } catch {
+            Write-SetupLog "[CRM-SERVER] Tier 1 failed: $($_.Exception.Message) -- trying Tier 2" 'WARN'
+        }
+    }
+
+    # --- Tier 2: Direct mysqld.exe (no service, standalone process) ---
+    Write-SetupLog "[CRM-SERVER] MySQL Tier 2: launching mysqld.exe standalone..."
+    if (Test-Path $mysqld) {
+        try {
+            # Kill any leftover mysqld processes.
+            Get-Process -Name 'mysqld' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+
+            # Initialize if needed.
+            if (-not (Test-Path "$dataDir\ibdata1")) {
+                $initArgs = @('--initialize-insecure', "--datadir=$dataDir")
+                $initProc = Start-Process -FilePath $mysqld -ArgumentList $initArgs -Wait -PassThru -NoNewWindow
+                Start-Sleep -Seconds 3
+            }
+
+            # Launch standalone (background).
+            $standArgs = @("--datadir=$dataDir", '--skip-networking=0', '--port=3306', '--skip-grant-tables')
+            if (Test-Path $myIni) { $standArgs = @("--defaults-file=$myIni") + $standArgs }
+            Start-Process -FilePath $mysqld -ArgumentList $standArgs -NoNewWindow -PassThru | Out-Null
+
+            # Wait up to 30s.
+            $alive = $false
+            for ($i = 0; $i -lt 30; $i++) {
+                Start-Sleep -Seconds 1
+                if (Test-MySqlAlive -MysqladminExe $mysqladmin) { $alive = $true; break }
+            }
+            if ($alive) {
+                Write-SetupLog "[CRM-SERVER] MySQL Tier 2 alive -- standalone process running"
+                return $mysql
+            } else {
+                throw "Standalone mysqld did not respond within 30 seconds"
+            }
+        } catch {
+            Write-SetupLog "[CRM-SERVER] Tier 2 failed: $($_.Exception.Message) -- falling back to file-only mode" 'WARN'
+        }
+    }
+
+    # --- Tier 3: File-only fallback ---
+    Write-SetupLog "[CRM-SERVER] All MySQL tiers failed -- running in file-only mode. SQL will be saved to $env:SystemDrive\GR_LabSetup\golden_crm_inserts.sql" 'WARN'
+    return $null
 }
 
 # ---------------------------------------------------------------------------
@@ -79,6 +235,9 @@ function Invoke-RoleSetup {
     $mysqldump    = "$xamppDir\mysql\bin\mysqldump.exe"
 
     # Track whether MySQL is actually available for population steps.
+    # When MySQL is brought up, $mysql is updated to the path returned by
+    # Start-LabMySQL (which may differ from the XAMPP path if a PATH instance
+    # was reused).
     $mysqlAvailable = $false
 
     # Fallback SQL dump path for graceful degradation.
@@ -88,7 +247,7 @@ function Invoke-RoleSetup {
     Write-SetupLog "[$role] Invoke-RoleSetup starting"
 
     # ==================================================================
-    # Step 1: Download and install XAMPP 8.2.12
+    # Step 1: Download and install XAMPP 8.2.12, then bring up MySQL
     # ==================================================================
     Write-SetupLog "[$role] Step 1: XAMPP download and install"
     $xamppInstalled = $false
@@ -128,46 +287,45 @@ function Invoke-RoleSetup {
         $xamppInstalled = $false
     }
 
+    # VC++ 2019 redistributable check -- XAMPP MySQL/PHP depend on it.
+    try {
+        $vcRedistKey = 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64'
+        if (-not (Test-Path $vcRedistKey)) {
+            $msg = "[$role] Step 1 WARN -- VC++ 2019 x64 redistributable not detected ($vcRedistKey missing). MySQL/PHP may fail to start; install vc_redist.x64.exe if so."
+            Write-SetupLog $msg 'WARN'
+            $errors.Add($msg)
+        } else {
+            Write-SetupLog "[$role] VC++ 2019 x64 redistributable present"
+        }
+    } catch {
+        Write-SetupLog "[$role] Step 1 WARN -- VC++ redist check failed: $($_.Exception.Message)" 'WARN'
+    }
+
     # ==================================================================
-    # Step 2: Start MySQL service
+    # Step 2: Start MySQL (3-tier strategy via Start-LabMySQL)
     # ==================================================================
     Write-SetupLog "[$role] Step 2: Start MySQL"
-    if ($xamppInstalled -and (Test-Path $mysql)) {
-        try {
-            # Register mysqld as a Windows service if not already present.
-            $svcName = 'MySQLForTraining'
-            if (-not (Get-Service -Name $svcName -ErrorAction SilentlyContinue)) {
-                & "$xamppDir\mysql\bin\mysqld.exe" "--install $svcName" 2>$null
-            }
-            Start-Service -Name $svcName -ErrorAction SilentlyContinue
-
-            # Wait up to 30 s for MySQL to respond to ping.
-            $maxWait = 30
-            $alive   = $false
-            for ($i = 0; $i -lt $maxWait; $i++) {
-                $pingResult = & $mysqladmin -u root ping 2>&1
-                if ($pingResult -match 'is alive') {
-                    $alive = $true
-                    break
-                }
-                Start-Sleep -Seconds 1
-            }
-
-            if ($alive) {
-                Write-SetupLog "[$role] MySQL is alive"
-                $mysqlAvailable = $true
-            } else {
-                $msg = "[$role] Step 2 WARN -- MySQL did not respond within 30 s"
-                Write-SetupLog $msg 'WARN'
-                $errors.Add($msg)
-            }
-        } catch {
-            $msg = "[$role] Step 2 WARN -- MySQL start failed: $($_.Exception.Message)"
+    try {
+        $resolvedMysql = Start-LabMySQL -XamppDir $xamppDir
+        if ($resolvedMysql) {
+            $mysql = $resolvedMysql
+            # Resolve the matching mysqladmin/mysqldump next to the chosen mysql.exe.
+            $binDir = Split-Path $mysql
+            $candidateAdmin = Join-Path $binDir 'mysqladmin.exe'
+            $candidateDump  = Join-Path $binDir 'mysqldump.exe'
+            if (Test-Path $candidateAdmin) { $mysqladmin = $candidateAdmin }
+            if (Test-Path $candidateDump)  { $mysqldump  = $candidateDump }
+            $mysqlAvailable = $true
+            Write-SetupLog "[$role] MySQL available -- using $mysql"
+        } else {
+            $msg = "[$role] Step 2 WARN -- MySQL could not be started (all tiers failed); file-only mode"
             Write-SetupLog $msg 'WARN'
             $errors.Add($msg)
         }
-    } else {
-        Write-SetupLog "[$role] Step 2 SKIP -- XAMPP not installed; skipping MySQL start" 'WARN'
+    } catch {
+        $msg = "[$role] Step 2 WARN -- MySQL start failed: $($_.Exception.Message)"
+        Write-SetupLog $msg 'WARN'
+        $errors.Add($msg)
     }
 
     # ==================================================================
@@ -260,8 +418,9 @@ CREATE TABLE IF NOT EXISTS users (
     # ==================================================================
     Write-SetupLog "[$role] Step 4: Populate tables"
 
-    # We always build the SQL batches; if MySQL is live we execute them,
-    # otherwise we accumulate them into $fallbackSqlLines.
+    # We always build the SQL batches; if MySQL is live we execute them via the
+    # new stdin-pipe Invoke-MySql, otherwise we accumulate them into
+    # $fallbackSqlLines for the graceful-degradation file.
     $fallbackSqlLines = [System.Collections.Generic.List[string]]::new()
     if (-not $mysqlAvailable) {
         # Include schema in fallback so it is self-contained.
