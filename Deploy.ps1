@@ -40,8 +40,41 @@ $ROLE_TABLE = [ordered]@{
     'ROUTER'     = @{ Label='Router Evidence';           IP='192.168.10.1';   User=$null;           Pwd=$null;             Script='router\Setup-Router.ps1' }
 }
 
-$SCRIPTS_DIR = Join-Path $PSScriptRoot 'scripts'
-$SHARED_LIB  = Join-Path $SCRIPTS_DIR 'shared\New-FakeData.ps1'
+# Self-locating: handles double-ZIP extraction (call-center-scam-main\call-center-scam-main\)
+function Find-ScriptsDir {
+    $candidates = @(
+        (Join-Path $PSScriptRoot 'scripts'),
+        (Join-Path (Split-Path $PSScriptRoot -Parent) 'scripts'),
+        (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'scripts'),
+        "$env:USERPROFILE\Downloads\call-center-scam-main\scripts",
+        "$env:USERPROFILE\Downloads\call-center-scam-main\call-center-scam-main\scripts",
+        "$env:USERPROFILE\Desktop\call-center-scam-main\scripts",
+        "C:\GR-Lab\scripts",
+        "C:\call-center-scam-main\scripts"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path (Join-Path $c 'shared\New-FakeData.ps1')) { return $c }
+    }
+    foreach ($base in @("$env:USERPROFILE\Downloads","$env:USERPROFILE\Desktop")) {
+        if (-not (Test-Path $base)) { continue }
+        $hit = Get-ChildItem -Path $base -Filter 'New-FakeData.ps1' -Recurse -Depth 6 -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($hit) { return (Split-Path (Split-Path $hit.FullName -Parent) -Parent) }
+    }
+    return $null
+}
+
+$SCRIPTS_DIR = Find-ScriptsDir
+if (-not $SCRIPTS_DIR) {
+    Write-Host "" 
+    Write-Host "  ERROR: Cannot locate the scripts\ folder." -ForegroundColor Red
+    Write-Host "  Make sure Deploy.ps1 and scripts\ are in the same directory." -ForegroundColor Yellow
+    Write-Host "  If you extracted a ZIP, look inside: call-center-scam-main\" -ForegroundColor Yellow
+    Write-Host ""
+    try { Read-Host "  Press Enter to exit" } catch {}
+    exit 1
+}
+$SHARED_LIB = Join-Path $SCRIPTS_DIR 'shared\New-FakeData.ps1'
+Write-Host "  [OK] Scripts folder: $SCRIPTS_DIR" -ForegroundColor DarkGray
 
 # -----------------------------------------------------------------------------
 #  HELPERS
@@ -400,23 +433,13 @@ function Write-Summary {
 # -----------------------------------------------------------------------------
 #  VERIFY SCRIPTS DIRECTORY EXISTS
 # -----------------------------------------------------------------------------
-if (-not (Test-Path $SCRIPTS_DIR)) {
-    Write-Host ""
-    Write-Host "  ERROR: scripts/ folder not found at: $SCRIPTS_DIR" -ForegroundColor Red
-    Write-Host "  Make sure Deploy.ps1 is in the repo root (same folder as scripts/)." -ForegroundColor Yellow
-    Write-Host ""
-    exit 1
-}
-if (-not (Test-Path $SHARED_LIB)) {
-    Write-Host ""
-    Write-Host "  ERROR: shared library not found at: $SHARED_LIB" -ForegroundColor Red
-    exit 1
-}
+# Path validation already handled by Find-ScriptsDir above
 
 # -----------------------------------------------------------------------------
 #  MAIN FLOW
 # -----------------------------------------------------------------------------
 $startTime = Get-Date
+$ErrorActionPreference = 'Continue'   # Don't crash on non-fatal errors in main flow
 Write-Banner
 
 # 1. Determine role ----------------------------------------------------------

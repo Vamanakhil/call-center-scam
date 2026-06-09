@@ -16,6 +16,17 @@
   real person, company, account or financial institution.
   Any resemblance to real people or entities is purely coincidental.
 
+  DESIGN PRINCIPLE
+  ----------------
+  Phase A generates ALL evidence files FIRST, before touching MySQL. This
+  guarantees trainees always have rich forensic evidence to analyze even if
+  MySQL never starts. The golden_crm_backup_2026-04-15.sql dump (built in
+  memory from the fake-data tables) IS the primary forensic artefact.
+
+  Phase B then makes a best-effort, non-fatal attempt to stand up a live
+  MySQL instance (3 tiers) and import the dump file already written in Phase A.
+  Failure of any/all Phase B tiers never aborts the run.
+
   Requirements : PowerShell 5.1 (.NET Framework 4.x), Windows Server 2019 /
                  Windows 10.  Must be run As Administrator.
                  Dot-sourced by 00-Master-Setup.ps1 which has already loaded
@@ -65,154 +76,362 @@ function Invoke-MySql {
 }
 
 # ---------------------------------------------------------------------------
-# Helper: probe whether a MySQL instance is responding to ping.
+# Helper: raw TCP probe of 127.0.0.1:3306. Faster and more reliable than
+# spawning mysqladmin just to test liveness.
 # ---------------------------------------------------------------------------
-function Test-MySqlAlive {
-    param([string]$MysqladminExe)
+function Test-Port3306 {
     try {
-        $r = & $MysqladminExe -u root --connect-timeout=3 ping 2>&1
-        return ($r -match 'alive')
-    } catch { return $false }
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $tcp.Connect('127.0.0.1', 3306)
+        $tcp.Close()
+        return $true
+    } catch {
+        return $false
+    }
 }
 
 # ---------------------------------------------------------------------------
-# Helper: bring up MySQL using a 3-tier strategy.
-#   Tier 0 : already alive (existing service or PATH instance) -> reuse
+# Helper: SQL-escape a value for single-quoted INSERT literals.
+# Always coerces to string; guards against $null so StrictMode is happy.
+# ---------------------------------------------------------------------------
+function Get-SqlString {
+    param($Value)
+    if ($null -eq $Value) { return '' }
+    return ([string]$Value) -replace "'", "''"
+}
+
+# ---------------------------------------------------------------------------
+# Helper: build the complete golden_crm SQL dump as a single string.
+# Schema + all victim/lead/transaction/call_log/users INSERTs, batched.
+# This is pure in-memory string work with NO external dependency, so it can
+# always run in Phase A regardless of MySQL availability.
+# ---------------------------------------------------------------------------
+function Build-GoldenCrmDump {
+    param(
+        $Victims,
+        $Leads,
+        $Transactions,
+        $CallLogs
+    )
+
+    $sb = [System.Text.StringBuilder]::new()
+
+    # --- Header ---
+    [void]$sb.AppendLine('-- Golden Returns CRM database backup')
+    [void]$sb.AppendLine('-- MySQL dump 10.13  Distrib 8.2.12, for Win64 (x86_64)')
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('-- Host: localhost (CRM-SERVER 192.168.10.100)    Database: golden_crm')
+    [void]$sb.AppendLine('-- ------------------------------------------------------')
+    [void]$sb.AppendLine('-- Server version 8.2.12 (XAMPP)')
+    [void]$sb.AppendLine('-- Backup generated: 2026-04-15 02:00:01')
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('-- *** SYNTHETIC TRAINING DATA ONLY -- entirely fictional ***')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;')
+    [void]$sb.AppendLine('/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;')
+    [void]$sb.AppendLine('/*!40101 SET NAMES utf8mb4 */;')
+    [void]$sb.AppendLine('/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;')
+    [void]$sb.AppendLine('')
+
+    # --- Schema ---
+    [void]$sb.AppendLine('CREATE DATABASE IF NOT EXISTS golden_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;')
+    [void]$sb.AppendLine('USE golden_crm;')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('CREATE TABLE IF NOT EXISTS victims (')
+    [void]$sb.AppendLine('    id               INT AUTO_INCREMENT PRIMARY KEY,')
+    [void]$sb.AppendLine('    victim_id        VARCHAR(20) UNIQUE NOT NULL,')
+    [void]$sb.AppendLine('    name             VARCHAR(100),')
+    [void]$sb.AppendLine('    phone            VARCHAR(20),')
+    [void]$sb.AppendLine('    email            VARCHAR(100),')
+    [void]$sb.AppendLine('    city             VARCHAR(50),')
+    [void]$sb.AppendLine('    amount_paid      DECIMAL(12,2),')
+    [void]$sb.AppendLine('    initial_deposit  DECIMAL(12,2),')
+    [void]$sb.AppendLine("    final_outcome    ENUM('BURNED','ACTIVE','REFUNDED') DEFAULT 'ACTIVE',")
+    [void]$sb.AppendLine('    assigned_closer  VARCHAR(50),')
+    [void]$sb.AppendLine('    date_added       DATE,')
+    [void]$sb.AppendLine("    status           ENUM('ACTIVE','CLOSED') DEFAULT 'ACTIVE',")
+    [void]$sb.AppendLine('    notes            TEXT')
+    [void]$sb.AppendLine(');')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('CREATE TABLE IF NOT EXISTS leads (')
+    [void]$sb.AppendLine('    id             INT AUTO_INCREMENT PRIMARY KEY,')
+    [void]$sb.AppendLine('    lead_id        INT UNIQUE,')
+    [void]$sb.AppendLine('    name           VARCHAR(100),')
+    [void]$sb.AppendLine('    phone          VARCHAR(20),')
+    [void]$sb.AppendLine('    email          VARCHAR(100),')
+    [void]$sb.AppendLine("    source         ENUM('LinkedIn','Facebook','Instagram','Purchased_List','Referral'),")
+    [void]$sb.AppendLine('    heat_score     INT,')
+    [void]$sb.AppendLine("    status         ENUM('HOT','WARM','COLD','ASSIGNED','DNC'),")
+    [void]$sb.AppendLine('    assigned_agent VARCHAR(50),')
+    [void]$sb.AppendLine('    date_added     DATE')
+    [void]$sb.AppendLine(');')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('CREATE TABLE IF NOT EXISTS transactions (')
+    [void]$sb.AppendLine('    id               INT AUTO_INCREMENT PRIMARY KEY,')
+    [void]$sb.AppendLine('    txn_id           INT UNIQUE,')
+    [void]$sb.AppendLine('    victim_id        VARCHAR(20),')
+    [void]$sb.AppendLine('    amount           DECIMAL(12,2),')
+    [void]$sb.AppendLine('    upi_id           VARCHAR(100),')
+    [void]$sb.AppendLine('    beneficiary_acct VARCHAR(50),')
+    [void]$sb.AppendLine('    txn_date         DATE,')
+    [void]$sb.AppendLine("    status           ENUM('CONFIRMED','PENDING','FAILED'),")
+    [void]$sb.AppendLine('    notes            TEXT')
+    [void]$sb.AppendLine(');')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('CREATE TABLE IF NOT EXISTS call_logs (')
+    [void]$sb.AppendLine('    id                  INT AUTO_INCREMENT PRIMARY KEY,')
+    [void]$sb.AppendLine('    log_id              INT UNIQUE,')
+    [void]$sb.AppendLine('    agent_id            VARCHAR(50),')
+    [void]$sb.AppendLine('    victim_id           VARCHAR(20),')
+    [void]$sb.AppendLine('    duration_seconds    INT,')
+    [void]$sb.AppendLine('    recording_filename  VARCHAR(200),')
+    [void]$sb.AppendLine('    call_date           DATE,')
+    [void]$sb.AppendLine("    call_type           ENUM('OUTBOUND','INBOUND'),")
+    [void]$sb.AppendLine("    outcome             ENUM('CONVERTED','FOLLOW_UP','NOT_INTERESTED','INVALID')")
+    [void]$sb.AppendLine(');')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('CREATE TABLE IF NOT EXISTS users (')
+    [void]$sb.AppendLine('    id            INT AUTO_INCREMENT PRIMARY KEY,')
+    [void]$sb.AppendLine('    username      VARCHAR(50) UNIQUE,')
+    [void]$sb.AppendLine('    password_hash VARCHAR(255),')
+    [void]$sb.AppendLine("    role          ENUM('admin','agent','readonly'),")
+    [void]$sb.AppendLine('    created_at    DATETIME DEFAULT NOW()')
+    [void]$sb.AppendLine(');')
+    [void]$sb.AppendLine('')
+
+    # --- victims (487 rows, batches of 100) ---
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('-- Dumping data for table `victims`')
+    [void]$sb.AppendLine('--')
+    $allVictims = @($Victims)
+    $bs = 100; $start = 0
+    while ($start -lt $allVictims.Count) {
+        $end = [math]::Min($start + $bs, $allVictims.Count)
+        $rows = [System.Collections.Generic.List[string]]::new()
+        for ($i = $start; $i -lt $end; $i++) {
+            $v     = $allVictims[$i]
+            $name  = Get-SqlString $v.Name
+            $phone = Get-SqlString $v.Phone
+            $email = Get-SqlString $v.Email
+            $city  = Get-SqlString $v.City
+            $notes = Get-SqlString $v.Notes
+            $rows.Add(
+                "('$($v.VictimId)','$name','$phone','$email','$city'," +
+                "$($v.AmountPaid),$($v.InitialDeposit)," +
+                "'$($v.FinalOutcome)','$($v.AssignedCloser)'," +
+                "'$($v.DateAdded)','$($v.Status)','$notes')"
+            )
+        }
+        [void]$sb.AppendLine('INSERT INTO victims (victim_id,name,phone,email,city,amount_paid,initial_deposit,final_outcome,assigned_closer,date_added,status,notes) VALUES')
+        [void]$sb.AppendLine(($rows -join ",`n") + ';')
+        $start = $end
+    }
+    [void]$sb.AppendLine('')
+
+    # --- leads (12,000 rows, batches of 500) ---
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('-- Dumping data for table `leads`')
+    [void]$sb.AppendLine('--')
+    $allLeads = @($Leads)
+    $bs = 500; $start = 0
+    while ($start -lt $allLeads.Count) {
+        $end = [math]::Min($start + $bs, $allLeads.Count)
+        $rows = [System.Collections.Generic.List[string]]::new()
+        for ($i = $start; $i -lt $end; $i++) {
+            $l     = $allLeads[$i]
+            $name  = Get-SqlString $l.Name
+            $phone = Get-SqlString $l.Phone
+            $email = Get-SqlString $l.Email
+            $agent = Get-SqlString $l.AssignedAgent
+            $rows.Add(
+                "($($l.LeadId),'$name','$phone','$email'," +
+                "'$($l.Source)',$($l.HeatScore),'$($l.Status)'," +
+                "'$agent','$($l.DateAdded)')"
+            )
+        }
+        [void]$sb.AppendLine('INSERT INTO leads (lead_id,name,phone,email,source,heat_score,status,assigned_agent,date_added) VALUES')
+        [void]$sb.AppendLine(($rows -join ",`n") + ';')
+        $start = $end
+    }
+    [void]$sb.AppendLine('')
+
+    # --- transactions (2,314 rows, batches of 100) ---
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('-- Dumping data for table `transactions`')
+    [void]$sb.AppendLine('--')
+    $allTxns = @($Transactions)
+    $bs = 100; $start = 0
+    while ($start -lt $allTxns.Count) {
+        $end = [math]::Min($start + $bs, $allTxns.Count)
+        $rows = [System.Collections.Generic.List[string]]::new()
+        for ($i = $start; $i -lt $end; $i++) {
+            $t     = $allTxns[$i]
+            $upi   = Get-SqlString $t.UpiId
+            $acct  = Get-SqlString $t.BeneficiaryAcct
+            $notes = Get-SqlString $t.Notes
+            $rows.Add(
+                "($($t.TxnId),'$($t.VictimId)',$($t.Amount)," +
+                "'$upi','$acct','$($t.TxnDate)'," +
+                "'$($t.Status)','$notes')"
+            )
+        }
+        [void]$sb.AppendLine('INSERT INTO transactions (txn_id,victim_id,amount,upi_id,beneficiary_acct,txn_date,status,notes) VALUES')
+        [void]$sb.AppendLine(($rows -join ",`n") + ';')
+        $start = $end
+    }
+    [void]$sb.AppendLine('')
+
+    # --- call_logs (891 rows, batches of 100) ---
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('-- Dumping data for table `call_logs`')
+    [void]$sb.AppendLine('--')
+    $allLogs = @($CallLogs)
+    $bs = 100; $start = 0
+    while ($start -lt $allLogs.Count) {
+        $end = [math]::Min($start + $bs, $allLogs.Count)
+        $rows = [System.Collections.Generic.List[string]]::new()
+        for ($i = $start; $i -lt $end; $i++) {
+            $c    = $allLogs[$i]
+            $agent = Get-SqlString $c.AgentId
+            $recf  = Get-SqlString $c.RecordingFilename
+            $rows.Add(
+                "($($c.LogId),'$agent','$($c.VictimId)'," +
+                "$($c.DurationSeconds),'$recf'," +
+                "'$($c.CallDate)','$($c.CallType)','$($c.Outcome)')"
+            )
+        }
+        [void]$sb.AppendLine('INSERT INTO call_logs (log_id,agent_id,victim_id,duration_seconds,recording_filename,call_date,call_type,outcome) VALUES')
+        [void]$sb.AppendLine(($rows -join ",`n") + ';')
+        $start = $end
+    }
+    [void]$sb.AppendLine('')
+
+    # --- users (with SHA2-256 password hashes) ---
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('-- Dumping data for table `users`')
+    [void]$sb.AppendLine('--')
+    [void]$sb.AppendLine('INSERT INTO users (username, password_hash, role) VALUES')
+    [void]$sb.AppendLine("('admin',    SHA2('Gr@Crm2026!',     256), 'admin'),")
+    [void]$sb.AppendLine("('crm_app',  SHA2('Gr@Crm2026!',     256), 'admin'),")
+    [void]$sb.AppendLine("('rahul.s',  SHA2('Gr@2026Agent01',  256), 'agent'),")
+    [void]$sb.AppendLine("('priya.v',  SHA2('Gr@2026Agent02',  256), 'agent'),")
+    [void]$sb.AppendLine("('amit.p',   SHA2('Gr@2026Agent03',  256), 'agent'),")
+    [void]$sb.AppendLine("('sneha.i',  SHA2('Gr@2026Agent04',  256), 'agent'),")
+    [void]$sb.AppendLine("('vikas.n',  SHA2('Gr@2026Agent05',  256), 'admin');")
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;')
+    [void]$sb.AppendLine('/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;')
+    [void]$sb.AppendLine('-- Dump completed on 2026-04-15  2:00:14')
+
+    return $sb.ToString()
+}
+
+# ---------------------------------------------------------------------------
+# Helper: bring up MySQL using a 3-tier strategy. NON-FATAL. Returns the path
+# to mysql.exe if MySQL becomes available, $null otherwise.
+#   Tier 0 : already alive on 127.0.0.1:3306 -> reuse
 #   Tier 1 : XAMPP MySQL as a Windows service (with data-dir init)
 #   Tier 2 : standalone mysqld.exe process (no service)
-#   Tier 3 : file-only fallback (returns $null)
-# Returns the path to mysql.exe if MySQL is available, $null otherwise.
 # ---------------------------------------------------------------------------
 function Start-LabMySQL {
     param([string]$XamppDir)
 
-    $mysql      = "$XamppDir\mysql\bin\mysql.exe"
-    $mysqladmin = "$XamppDir\mysql\bin\mysqladmin.exe"
-    $mysqld     = "$XamppDir\mysql\bin\mysqld.exe"
-    $myIni      = "$XamppDir\mysql\bin\my.ini"
-    $dataDir    = "$XamppDir\mysql\data"
-    $svcName    = 'GR_MySQL_Lab'
+    $mysql   = "$XamppDir\mysql\bin\mysql.exe"
+    $mysqld  = "$XamppDir\mysql\bin\mysqld.exe"
+    $myIni   = "$XamppDir\mysql\bin\my.ini"
+    $dataDir = "$XamppDir\mysql\data"
+    $svcName = 'GR_MySQL_Lab'
 
-    # --- Tier 0: Is MySQL already alive? ---
-    Write-SetupLog "[CRM-SERVER] MySQL Tier 0: checking if MySQL already responding..."
-    if (Test-Path $mysqladmin) {
-        if (Test-MySqlAlive -MysqladminExe $mysqladmin) {
-            Write-SetupLog "[CRM-SERVER] MySQL already alive -- using existing instance"
-            return $mysql
-        }
-    }
-    # Also check if any mysql.exe is in PATH (PowerShell 5.1 compatible -- no null-conditional).
-    $mysqlCmd = Get-Command 'mysql.exe' -ErrorAction SilentlyContinue
-    $mysqlInPath = if ($mysqlCmd) { $mysqlCmd.Source } else { $null }
-    if ($mysqlInPath) {
-        $adminInPath = Join-Path (Split-Path $mysqlInPath) 'mysqladmin.exe'
-        if ((Test-Path $adminInPath) -and (Test-MySqlAlive -MysqladminExe $adminInPath)) {
-            Write-SetupLog "[CRM-SERVER] MySQL found in PATH and alive: $mysqlInPath"
-            return $mysqlInPath
-        }
+    # --- Tier 0: Is MySQL already alive (TCP 127.0.0.1:3306)? ---
+    Write-SetupLog "[CRM-SERVER] MySQL Tier 0: TCP check 127.0.0.1:3306..."
+    if (Test-Port3306) {
+        Write-SetupLog "[CRM-SERVER] MySQL already alive on port 3306 -- reusing instance"
+        if (Test-Path $mysql) { return $mysql }
+        $mysqlCmd = Get-Command 'mysql.exe' -ErrorAction SilentlyContinue
+        if ($mysqlCmd) { return $mysqlCmd.Source }
+        return $mysql
     }
 
-    # --- Tier 1: XAMPP MySQL ---
-    Write-SetupLog "[CRM-SERVER] MySQL Tier 1: XAMPP MySQL at $XamppDir..."
-    if (-not (Test-Path $mysql)) {
-        Write-SetupLog "[CRM-SERVER] XAMPP mysql.exe not found -- skipping Tier 1" 'WARN'
+    # --- Tier 1: XAMPP MySQL as a Windows service ---
+    Write-SetupLog "[CRM-SERVER] MySQL Tier 1: XAMPP service at $XamppDir..."
+    if (-not (Test-Path $mysqld)) {
+        Write-SetupLog "[CRM-SERVER] XAMPP mysqld.exe not found -- skipping Tier 1" 'WARN'
     } else {
         try {
-            # Stop + unregister any old conflicting service to avoid port conflicts.
-            @('GR_MySQL_Lab', 'MySQLForTraining', 'mysql', 'MySQL80', 'MySQL57') | ForEach-Object {
-                $svc = Get-Service -Name $_ -ErrorAction SilentlyContinue
-                if ($svc) {
-                    if ($svc.Status -eq 'Running') {
-                        Stop-Service -Name $_ -Force -ErrorAction SilentlyContinue
-                        Start-Sleep -Seconds 2
-                    }
-                    & $mysqld '--remove' $_ 2>$null | Out-Null
-                    Start-Sleep -Seconds 1
-                }
-            }
-
-            # Initialize data directory if this is a fresh install.
+            # Initialize data dir if fresh.
             if (-not (Test-Path "$dataDir\ibdata1")) {
                 Write-SetupLog "[CRM-SERVER] Initializing MySQL data directory..."
-                $initArgs = @('--initialize-insecure', "--datadir=$dataDir")
-                if (Test-Path $myIni) { $initArgs += "--defaults-file=$myIni" }
-                $initProc = Start-Process -FilePath $mysqld -ArgumentList $initArgs -Wait -PassThru -NoNewWindow -ErrorAction Stop
-                if ($initProc.ExitCode -ne 0) { throw "mysqld --initialize-insecure failed (exit $($initProc.ExitCode))" }
-                Start-Sleep -Seconds 2
-                Write-SetupLog "[CRM-SERVER] Data directory initialized"
+                & $mysqld '--initialize-insecure' "--datadir=$dataDir" 2>&1 | Out-Null
+                Start-Sleep -Seconds 5
             }
 
-            # Register as Windows service.
-            Write-SetupLog "[CRM-SERVER] Installing MySQL service '$svcName'..."
-            $installArgs = @('--install', $svcName)
-            if (Test-Path $myIni) { $installArgs += "--defaults-file=$myIni" }
-            & $mysqld @installArgs 2>$null | Out-Null
+            # Remove any conflicting old service to avoid port conflicts.
+            foreach ($svc in @('GR_MySQL_Lab','MySQLForTraining','mysql','MySQL80','MySQL57')) {
+                if (Get-Service $svc -ErrorAction SilentlyContinue) {
+                    Stop-Service $svc -Force -ErrorAction SilentlyContinue
+                    Start-Sleep 1
+                    & $mysqld '--remove' $svc 2>&1 | Out-Null
+                }
+            }
+
+            # Register service (THREE separate args) then start.
+            if (Test-Path $myIni) {
+                & $mysqld '--install' $svcName "--defaults-file=$myIni" 2>&1 | Out-Null
+            } else {
+                & $mysqld '--install' $svcName 2>&1 | Out-Null
+            }
             Start-Sleep -Seconds 2
+            Start-Service $svcName -ErrorAction Stop
 
-            # Start the service.
-            Write-SetupLog "[CRM-SERVER] Starting service '$svcName'..."
-            Start-Service -Name $svcName -ErrorAction Stop
-
-            # Wait up to 60s for MySQL to respond.
-            Write-SetupLog "[CRM-SERVER] Waiting for MySQL to accept connections (up to 60s)..."
+            # Wait up to 60s for port 3306.
+            Write-SetupLog "[CRM-SERVER] Waiting for MySQL port 3306 (up to 60s)..."
             $alive = $false
             for ($i = 0; $i -lt 60; $i++) {
-                if (Test-MySqlAlive -MysqladminExe $mysqladmin) {
-                    $alive = $true
-                    break
-                }
+                if (Test-Port3306) { $alive = $true; break }
                 Start-Sleep -Seconds 1
             }
             if ($alive) {
                 Write-SetupLog "[CRM-SERVER] MySQL Tier 1 alive -- XAMPP service running"
                 return $mysql
-            } else {
-                throw "MySQL service started but did not respond within 60 seconds"
             }
+            throw "MySQL service started but port 3306 never opened within 60 seconds"
         } catch {
             Write-SetupLog "[CRM-SERVER] Tier 1 failed: $($_.Exception.Message) -- trying Tier 2" 'WARN'
         }
     }
 
-    # --- Tier 2: Direct mysqld.exe (no service, standalone process) ---
+    # --- Tier 2: standalone mysqld.exe process (no service) ---
     Write-SetupLog "[CRM-SERVER] MySQL Tier 2: launching mysqld.exe standalone..."
     if (Test-Path $mysqld) {
         try {
-            # Kill any leftover mysqld processes.
             Get-Process -Name 'mysqld' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 2
 
-            # Initialize if needed.
             if (-not (Test-Path "$dataDir\ibdata1")) {
-                $initArgs = @('--initialize-insecure', "--datadir=$dataDir")
-                $initProc = Start-Process -FilePath $mysqld -ArgumentList $initArgs -Wait -PassThru -NoNewWindow
+                & $mysqld '--initialize-insecure' "--datadir=$dataDir" 2>&1 | Out-Null
                 Start-Sleep -Seconds 3
             }
 
-            # Launch standalone (background).
-            $standArgs = @("--datadir=$dataDir", '--skip-networking=0', '--port=3306', '--skip-grant-tables')
+            $standArgs = @("--datadir=$dataDir", '--port=3306', '--skip-grant-tables')
             if (Test-Path $myIni) { $standArgs = @("--defaults-file=$myIni") + $standArgs }
             Start-Process -FilePath $mysqld -ArgumentList $standArgs -NoNewWindow -PassThru | Out-Null
 
-            # Wait up to 30s.
             $alive = $false
             for ($i = 0; $i -lt 30; $i++) {
                 Start-Sleep -Seconds 1
-                if (Test-MySqlAlive -MysqladminExe $mysqladmin) { $alive = $true; break }
+                if (Test-Port3306) { $alive = $true; break }
             }
             if ($alive) {
                 Write-SetupLog "[CRM-SERVER] MySQL Tier 2 alive -- standalone process running"
                 return $mysql
-            } else {
-                throw "Standalone mysqld did not respond within 30 seconds"
             }
+            throw "Standalone mysqld port 3306 never opened within 30 seconds"
         } catch {
-            Write-SetupLog "[CRM-SERVER] Tier 2 failed: $($_.Exception.Message) -- falling back to file-only mode" 'WARN'
+            Write-SetupLog "[CRM-SERVER] Tier 2 failed: $($_.Exception.Message) -- continuing file-only" 'WARN'
         }
     }
 
-    # --- Tier 3: File-only fallback ---
-    Write-SetupLog "[CRM-SERVER] All MySQL tiers failed -- running in file-only mode. SQL will be saved to $env:SystemDrive\GR_LabSetup\golden_crm_inserts.sql" 'WARN'
+    Write-SetupLog "[CRM-SERVER] All MySQL tiers failed -- Phase A artefacts already written; continuing" 'WARN'
     return $null
 }
 
@@ -222,6 +441,7 @@ function Start-LabMySQL {
 function Invoke-RoleSetup {
     <#
         Creates all CRM-SERVER evidence artefacts.
+        Phase A (file artefacts) always succeeds; Phase B (MySQL) is best-effort.
         Returns @{ Role='CRM-SERVER'; FilesCreated=N; Errors=@() }
     #>
 
@@ -229,509 +449,153 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors       = [System.Collections.Generic.List[string]]::new()
 
-    $xamppDir     = "$env:SystemDrive\xampp"
-    $mysql        = "$xamppDir\mysql\bin\mysql.exe"
-    $mysqladmin   = "$xamppDir\mysql\bin\mysqladmin.exe"
-    $mysqldump    = "$xamppDir\mysql\bin\mysqldump.exe"
+    $xamppDir   = "$env:SystemDrive\xampp"
+    $mysql      = "$xamppDir\mysql\bin\mysql.exe"
 
-    # Track whether MySQL is actually available for population steps.
-    # When MySQL is brought up, $mysql is updated to the path returned by
-    # Start-LabMySQL (which may differ from the XAMPP path if a PATH instance
-    # was reused).
-    $mysqlAvailable = $false
-
-    # Fallback SQL dump path for graceful degradation.
-    $fallbackSqlDir  = "$env:SystemDrive\GR_LabSetup"
-    $fallbackSqlFile = "$fallbackSqlDir\golden_crm_inserts.sql"
+    # Resolve backup dir once (D: preferred, else system drive).
+    $backupDir  = if (Test-Path 'D:\') { 'D:\Backups\old' } else { "$env:SystemDrive\CRM_Backups\old" }
+    $sqlDumpFile = Join-Path $backupDir 'golden_crm_backup_2026-04-15.sql'
 
     Write-SetupLog "[$role] Invoke-RoleSetup starting"
 
-    # ==================================================================
-    # Step 1: Download and install XAMPP 8.2.12, then bring up MySQL
-    # ==================================================================
-    Write-SetupLog "[$role] Step 1: XAMPP download and install"
-    $xamppInstalled = $false
+    # ##################################################################
+    # PHASE A -- File artefacts (no MySQL needed, always succeed)
+    # ##################################################################
+    Write-SetupLog "[$role] ===== PHASE A: file artefacts (always succeed) ====="
+
+    # ------------------------------------------------------------------
+    # A1. Build the complete SQL dump string in memory.
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A1: building golden_crm SQL dump in memory"
+    $dumpSql = $null
     try {
-        if (Test-Path "$xamppDir\mysql\bin\mysql.exe") {
-            Write-SetupLog "[$role] XAMPP already installed at $xamppDir -- skipping download"
-            $xamppInstalled = $true
-        } else {
-            $xamppInstaller = "$env:TEMP\xampp-installer.exe"
-            $xamppUrl = 'https://sourceforge.net/projects/xampp/files/XAMPP%20Windows/8.2.12/xampp-windows-x64-8.2.12-0-VS16-installer.exe/download'
-
-            Write-SetupLog "[$role] Downloading XAMPP 8.2.12 (~170 MB)... this will take a few minutes"
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-            $oldProgress    = $ProgressPreference
-            $ProgressPreference = 'SilentlyContinue'
-            try {
-                Invoke-WebRequest -Uri $xamppUrl -OutFile $xamppInstaller -UseBasicParsing -TimeoutSec 600
-            } finally {
-                $ProgressPreference = $oldProgress
-            }
-
-            Write-SetupLog "[$role] Installing XAMPP silently..."
-            $proc = Start-Process -FilePath $xamppInstaller `
-                -ArgumentList '--mode unattended --disable-components xampp_php,xampp_perl,xampp_phpmyadmin,xampp_filezilla,xampp_mercury,xampp_tomcat' `
-                -Wait -PassThru
-            if ($proc.ExitCode -ne 0) {
-                throw "XAMPP installer exited with code $($proc.ExitCode)"
-            }
-            $xamppInstalled = $true
-            Write-SetupLog "[$role] XAMPP installed successfully"
-        }
+        $dumpSql = Build-GoldenCrmDump `
+            -Victims      $VictimData `
+            -Leads        $LeadData `
+            -Transactions $TransactionData `
+            -CallLogs     $CallLogData
+        Write-SetupLog "[$role] A1 complete: dump built ($($dumpSql.Length) chars)"
     } catch {
-        $msg = "[$role] Step 1 WARN -- XAMPP download/install failed: $($_.Exception.Message) -- will create file artefacts only"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-        $xamppInstalled = $false
-    }
-
-    # VC++ 2019 redistributable check -- XAMPP MySQL/PHP depend on it.
-    try {
-        $vcRedistKey = 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64'
-        if (-not (Test-Path $vcRedistKey)) {
-            $msg = "[$role] Step 1 WARN -- VC++ 2019 x64 redistributable not detected ($vcRedistKey missing). MySQL/PHP may fail to start; install vc_redist.x64.exe if so."
-            Write-SetupLog $msg 'WARN'
-            $errors.Add($msg)
-        } else {
-            Write-SetupLog "[$role] VC++ 2019 x64 redistributable present"
-        }
-    } catch {
-        Write-SetupLog "[$role] Step 1 WARN -- VC++ redist check failed: $($_.Exception.Message)" 'WARN'
-    }
-
-    # ==================================================================
-    # Step 2: Start MySQL (3-tier strategy via Start-LabMySQL)
-    # ==================================================================
-    Write-SetupLog "[$role] Step 2: Start MySQL"
-    try {
-        $resolvedMysql = Start-LabMySQL -XamppDir $xamppDir
-        if ($resolvedMysql) {
-            $mysql = $resolvedMysql
-            # Resolve the matching mysqladmin/mysqldump next to the chosen mysql.exe.
-            $binDir = Split-Path $mysql
-            $candidateAdmin = Join-Path $binDir 'mysqladmin.exe'
-            $candidateDump  = Join-Path $binDir 'mysqldump.exe'
-            if (Test-Path $candidateAdmin) { $mysqladmin = $candidateAdmin }
-            if (Test-Path $candidateDump)  { $mysqldump  = $candidateDump }
-            $mysqlAvailable = $true
-            Write-SetupLog "[$role] MySQL available -- using $mysql"
-        } else {
-            $msg = "[$role] Step 2 WARN -- MySQL could not be started (all tiers failed); file-only mode"
-            Write-SetupLog $msg 'WARN'
-            $errors.Add($msg)
-        }
-    } catch {
-        $msg = "[$role] Step 2 WARN -- MySQL start failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ==================================================================
-    # Step 3: Create golden_crm database and tables
-    # ==================================================================
-    Write-SetupLog "[$role] Step 3: Create golden_crm database and tables"
-
-    $schemaSql = @'
-CREATE DATABASE IF NOT EXISTS golden_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE golden_crm;
-
-CREATE TABLE IF NOT EXISTS victims (
-    id               INT AUTO_INCREMENT PRIMARY KEY,
-    victim_id        VARCHAR(20) UNIQUE NOT NULL,
-    name             VARCHAR(100),
-    phone            VARCHAR(20),
-    email            VARCHAR(100),
-    city             VARCHAR(50),
-    amount_paid      DECIMAL(12,2),
-    initial_deposit  DECIMAL(12,2),
-    final_outcome    ENUM('BURNED','ACTIVE','REFUNDED') DEFAULT 'ACTIVE',
-    assigned_closer  VARCHAR(50),
-    date_added       DATE,
-    status           ENUM('ACTIVE','CLOSED') DEFAULT 'ACTIVE',
-    notes            TEXT
-);
-
-CREATE TABLE IF NOT EXISTS leads (
-    id             INT AUTO_INCREMENT PRIMARY KEY,
-    lead_id        INT UNIQUE,
-    name           VARCHAR(100),
-    phone          VARCHAR(20),
-    email          VARCHAR(100),
-    source         ENUM('LinkedIn','Facebook','Instagram','Purchased_List','Referral'),
-    heat_score     INT,
-    status         ENUM('HOT','WARM','COLD','ASSIGNED','DNC'),
-    assigned_agent VARCHAR(50),
-    date_added     DATE
-);
-
-CREATE TABLE IF NOT EXISTS transactions (
-    id               INT AUTO_INCREMENT PRIMARY KEY,
-    txn_id           INT UNIQUE,
-    victim_id        VARCHAR(20),
-    amount           DECIMAL(12,2),
-    upi_id           VARCHAR(100),
-    beneficiary_acct VARCHAR(50),
-    txn_date         DATE,
-    status           ENUM('CONFIRMED','PENDING','FAILED'),
-    notes            TEXT
-);
-
-CREATE TABLE IF NOT EXISTS call_logs (
-    id                  INT AUTO_INCREMENT PRIMARY KEY,
-    log_id              INT UNIQUE,
-    agent_id            VARCHAR(50),
-    victim_id           VARCHAR(20),
-    duration_seconds    INT,
-    recording_filename  VARCHAR(200),
-    call_date           DATE,
-    call_type           ENUM('OUTBOUND','INBOUND'),
-    outcome             ENUM('CONVERTED','FOLLOW_UP','NOT_INTERESTED','INVALID')
-);
-
-CREATE TABLE IF NOT EXISTS users (
-    id            INT AUTO_INCREMENT PRIMARY KEY,
-    username      VARCHAR(50) UNIQUE,
-    password_hash VARCHAR(255),
-    role          ENUM('admin','agent','readonly'),
-    created_at    DATETIME DEFAULT NOW()
-);
-'@
-
-    if ($mysqlAvailable) {
-        try {
-            Invoke-MySql -Sql $schemaSql -MysqlExe $mysql
-            Write-SetupLog "[$role] golden_crm schema created"
-        } catch {
-            $msg = "[$role] Step 3 WARN -- schema creation failed: $($_.Exception.Message)"
-            Write-SetupLog $msg 'WARN'
-            $errors.Add($msg)
-            $mysqlAvailable = $false
-        }
-    } else {
-        Write-SetupLog "[$role] Step 3 SKIP -- MySQL not available; schema will be written to fallback file" 'WARN'
-    }
-
-    # ==================================================================
-    # Step 4: Populate tables (or save fallback SQL)
-    # ==================================================================
-    Write-SetupLog "[$role] Step 4: Populate tables"
-
-    # We always build the SQL batches; if MySQL is live we execute them via the
-    # new stdin-pipe Invoke-MySql, otherwise we accumulate them into
-    # $fallbackSqlLines for the graceful-degradation file.
-    $fallbackSqlLines = [System.Collections.Generic.List[string]]::new()
-    if (-not $mysqlAvailable) {
-        # Include schema in fallback so it is self-contained.
-        $fallbackSqlLines.Add($schemaSql)
-        $fallbackSqlLines.Add('')
-    }
-
-    # ------------------------------------------------------------------
-    # 4a. Victims (487 rows, batches of 100)
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 4a: victims (487 rows)"
-    try {
-        $batchSize  = 100
-        $batchStart = 0
-        $allVictims = @($VictimData)
-
-        while ($batchStart -lt $allVictims.Count) {
-            $batchEnd = [math]::Min($batchStart + $batchSize, $allVictims.Count)
-            $rows     = [System.Collections.Generic.List[string]]::new()
-
-            for ($i = $batchStart; $i -lt $batchEnd; $i++) {
-                $v       = $allVictims[$i]
-                $name    = $v.Name    -replace "'", "''"
-                $phone   = $v.Phone   -replace "'", "''"
-                $email   = $v.Email   -replace "'", "''"
-                $city    = $v.City    -replace "'", "''"
-                $notes   = $v.Notes   -replace "'", "''"
-                $rows.Add(
-                    "('$($v.VictimId)','$name','$phone','$email','$city'," +
-                    "$($v.AmountPaid),$($v.InitialDeposit)," +
-                    "'$($v.FinalOutcome)','$($v.AssignedCloser)'," +
-                    "'$($v.DateAdded)','$($v.Status)','$notes')"
-                )
-            }
-
-            $batchSql  = "INSERT INTO victims (victim_id,name,phone,email,city,amount_paid,initial_deposit,final_outcome,assigned_closer,date_added,status,notes) VALUES`n"
-            $batchSql += ($rows -join ",`n") + ";"
-
-            if ($mysqlAvailable) {
-                Invoke-MySql -Sql $batchSql -Database 'golden_crm' -MysqlExe $mysql
-            } else {
-                $fallbackSqlLines.Add($batchSql)
-                $fallbackSqlLines.Add('')
-            }
-
-            $batchStart = $batchEnd
-        }
-        Write-SetupLog "[$role] Step 4a: victims inserted"
-    } catch {
-        $msg = "[$role] Step 4a WARN -- victims insert failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ------------------------------------------------------------------
-    # 4b. Leads (12,000 rows, batches of 500)
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 4b: leads (12,000 rows)"
-    try {
-        $batchSize  = 500
-        $batchStart = 0
-        $allLeads   = @($LeadData)
-
-        while ($batchStart -lt $allLeads.Count) {
-            $batchEnd = [math]::Min($batchStart + $batchSize, $allLeads.Count)
-            $rows     = [System.Collections.Generic.List[string]]::new()
-
-            for ($i = $batchStart; $i -lt $batchEnd; $i++) {
-                $l     = $allLeads[$i]
-                $name  = $l.Name          -replace "'", "''"
-                $phone = $l.Phone         -replace "'", "''"
-                $email = $l.Email         -replace "'", "''"
-                $agent = $l.AssignedAgent -replace "'", "''"
-                $rows.Add(
-                    "($($l.LeadId),'$name','$phone','$email'," +
-                    "'$($l.Source)',$($l.HeatScore),'$($l.Status)'," +
-                    "'$agent','$($l.DateAdded)')"
-                )
-            }
-
-            $batchSql  = "INSERT INTO leads (lead_id,name,phone,email,source,heat_score,status,assigned_agent,date_added) VALUES`n"
-            $batchSql += ($rows -join ",`n") + ";"
-
-            if ($mysqlAvailable) {
-                Invoke-MySql -Sql $batchSql -Database 'golden_crm' -MysqlExe $mysql
-            } else {
-                $fallbackSqlLines.Add($batchSql)
-                $fallbackSqlLines.Add('')
-            }
-
-            $batchStart = $batchEnd
-        }
-        Write-SetupLog "[$role] Step 4b: leads inserted"
-    } catch {
-        $msg = "[$role] Step 4b WARN -- leads insert failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ------------------------------------------------------------------
-    # 4c. Transactions (2,314 rows, batches of 100)
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 4c: transactions (2,314 rows)"
-    try {
-        $batchSize   = 100
-        $batchStart  = 0
-        $allTxns     = @($TransactionData)
-
-        while ($batchStart -lt $allTxns.Count) {
-            $batchEnd = [math]::Min($batchStart + $batchSize, $allTxns.Count)
-            $rows     = [System.Collections.Generic.List[string]]::new()
-
-            for ($i = $batchStart; $i -lt $batchEnd; $i++) {
-                $t     = $allTxns[$i]
-                $upi   = $t.UpiId           -replace "'", "''"
-                $acct  = $t.BeneficiaryAcct -replace "'", "''"
-                $notes = $t.Notes           -replace "'", "''"
-                $rows.Add(
-                    "($($t.TxnId),'$($t.VictimId)',$($t.Amount)," +
-                    "'$upi','$acct','$($t.TxnDate)'," +
-                    "'$($t.Status)','$notes')"
-                )
-            }
-
-            $batchSql  = "INSERT INTO transactions (txn_id,victim_id,amount,upi_id,beneficiary_acct,txn_date,status,notes) VALUES`n"
-            $batchSql += ($rows -join ",`n") + ";"
-
-            if ($mysqlAvailable) {
-                Invoke-MySql -Sql $batchSql -Database 'golden_crm' -MysqlExe $mysql
-            } else {
-                $fallbackSqlLines.Add($batchSql)
-                $fallbackSqlLines.Add('')
-            }
-
-            $batchStart = $batchEnd
-        }
-        Write-SetupLog "[$role] Step 4c: transactions inserted"
-    } catch {
-        $msg = "[$role] Step 4c WARN -- transactions insert failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ------------------------------------------------------------------
-    # 4d. Call logs (891 rows, batches of 100)
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 4d: call_logs (891 rows)"
-    try {
-        $batchSize   = 100
-        $batchStart  = 0
-        $allLogs     = @($CallLogData)
-
-        while ($batchStart -lt $allLogs.Count) {
-            $batchEnd = [math]::Min($batchStart + $batchSize, $allLogs.Count)
-            $rows     = [System.Collections.Generic.List[string]]::new()
-
-            for ($i = $batchStart; $i -lt $batchEnd; $i++) {
-                $c    = $allLogs[$i]
-                $agent = $c.AgentId           -replace "'", "''"
-                $recf  = $c.RecordingFilename -replace "'", "''"
-                $rows.Add(
-                    "($($c.LogId),'$agent','$($c.VictimId)'," +
-                    "$($c.DurationSeconds),'$recf'," +
-                    "'$($c.CallDate)','$($c.CallType)','$($c.Outcome)')"
-                )
-            }
-
-            $batchSql  = "INSERT INTO call_logs (log_id,agent_id,victim_id,duration_seconds,recording_filename,call_date,call_type,outcome) VALUES`n"
-            $batchSql += ($rows -join ",`n") + ";"
-
-            if ($mysqlAvailable) {
-                Invoke-MySql -Sql $batchSql -Database 'golden_crm' -MysqlExe $mysql
-            } else {
-                $fallbackSqlLines.Add($batchSql)
-                $fallbackSqlLines.Add('')
-            }
-
-            $batchStart = $batchEnd
-        }
-        Write-SetupLog "[$role] Step 4d: call_logs inserted"
-    } catch {
-        $msg = "[$role] Step 4d WARN -- call_logs insert failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ------------------------------------------------------------------
-    # 4e. Users
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 4e: users"
-    $usersSql = @"
-INSERT INTO users (username, password_hash, role) VALUES
-('admin',    SHA2('Gr@Crm2026!',     256), 'admin'),
-('crm_app',  SHA2('Gr@Crm2026!',     256), 'admin'),
-('rahul.s',  SHA2('Gr@2026Agent01',  256), 'agent'),
-('priya.v',  SHA2('Gr@2026Agent02',  256), 'agent'),
-('amit.p',   SHA2('Gr@2026Agent03',  256), 'agent'),
-('sneha.i',  SHA2('Gr@2026Agent04',  256), 'agent'),
-('vikas.n',  SHA2('Gr@2026Agent05',  256), 'admin');
-"@
-    try {
-        if ($mysqlAvailable) {
-            Invoke-MySql -Sql $usersSql -Database 'golden_crm' -MysqlExe $mysql
-            Write-SetupLog "[$role] Step 4e: users inserted"
-        } else {
-            $fallbackSqlLines.Add($usersSql)
-            $fallbackSqlLines.Add('')
-        }
-    } catch {
-        $msg = "[$role] Step 4e WARN -- users insert failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ------------------------------------------------------------------
-    # Graceful-degradation: write fallback SQL file if MySQL was not used.
-    # ------------------------------------------------------------------
-    if (-not $mysqlAvailable) {
-        try {
-            New-DirectoryIfMissing $fallbackSqlDir
-            $fallbackSqlLines | Set-Content -Path $fallbackSqlFile -Encoding UTF8
-            Add-HashRecord -FilePath $fallbackSqlFile -Role $role
-            $filesCreated++
-            Write-SetupLog "[$role] MySQL population skipped -- inserts saved to $fallbackSqlFile" 'WARN'
-        } catch {
-            $msg = "[$role] Fallback SQL write FAILED: $($_.Exception.Message)"
-            Write-SetupLog $msg 'ERROR'
-            $errors.Add($msg)
-        }
-    }
-
-    # ==================================================================
-    # Step 5: mysqldump backup ("the hidden backup")
-    # ==================================================================
-    Write-SetupLog "[$role] Step 5: mysqldump backup"
-    try {
-        $backupDir = if (Test-Path 'D:\') { 'D:\Backups\old' } else { "$env:SystemDrive\CRM_Backups\old" }
-        New-DirectoryIfMissing $backupDir
-
-        $backupFile = Join-Path $backupDir 'golden_crm_backup_2026-04-15.sql'
-
-        if ($mysqlAvailable -and (Test-Path $mysqldump)) {
-            & $mysqldump -u root golden_crm | Set-Content -Path $backupFile -Encoding UTF8
-            Write-SetupLog "[$role] Created mysqldump backup: $backupFile"
-        } else {
-            # Write a stub backup file so the artefact still exists.
-            $stubContent = @"
--- Golden Returns CRM database backup
--- Generated: 2026-04-15 02:00:01
--- Host: CRM-SERVER  Database: golden_crm
--- XAMPP MySQL 8.2.12
--- NOTE: This is a stub backup. MySQL was not available during lab setup.
---       Import $fallbackSqlFile to recreate full data.
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET NAMES utf8mb4 */;
-/*!50503 SET NAMES utf8mb4 */;
-
-USE `golden_crm`;
-"@
-            $stubContent | Set-Content -Path $backupFile -Encoding UTF8
-            Write-SetupLog "[$role] Created stub backup file (MySQL unavailable): $backupFile" 'WARN'
-        }
-
-        Add-HashRecord -FilePath $backupFile -Role $role
-        $filesCreated++
-        Write-SetupLog "[$role] Step 5 complete: $backupFile"
-    } catch {
-        $msg = "[$role] Step 5 FAILED (mysqldump backup): $($_.Exception.Message)"
+        $msg = "[$role] A1 FAILED (build dump): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ==================================================================
-    # Step 6: SMB share "old" for the backup directory
-    # ==================================================================
-    Write-SetupLog "[$role] Step 6: SMB share 'old'"
+    # ------------------------------------------------------------------
+    # A2. Write golden_crm_backup_2026-04-15.sql (THE forensic artefact).
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A2: writing $sqlDumpFile"
     try {
-        $backupDir = if (Test-Path 'D:\') { 'D:\Backups\old' } else { "$env:SystemDrive\CRM_Backups\old" }
         New-DirectoryIfMissing $backupDir
-
-        $shareName = 'old'
-        $shareDesc = 'Backup archive'
-
-        # Remove existing share if present (ignore errors if it doesn't exist).
-        & net share $shareName /delete 2>$null | Out-Null
-
-        # Create the share with Everyone:FULL for training realism.
-        $result = & net share "${shareName}=${backupDir}" "/REMARK:$shareDesc" '/GRANT:Everyone,FULL' 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "net share returned exit $LASTEXITCODE : $result"
+        if ($null -ne $dumpSql) {
+            [System.IO.File]::WriteAllText($sqlDumpFile, $dumpSql, [System.Text.Encoding]::UTF8)
+            Add-HashRecord -FilePath $sqlDumpFile -Role $role
+            $filesCreated++
+            Write-SetupLog "[$role] A2 complete: $sqlDumpFile"
+        } else {
+            $msg = "[$role] A2 SKIP -- dump string was not built"
+            Write-SetupLog $msg 'WARN'
+            $errors.Add($msg)
         }
-        Write-SetupLog "[$role] Step 6 complete: SMB share '$shareName' -> $backupDir"
     } catch {
-        $msg = "[$role] Step 6 WARN -- SMB share 'old' failed: $($_.Exception.Message)"
+        $msg = "[$role] A2 FAILED (write SQL dump): $($_.Exception.Message)"
+        Write-SetupLog $msg 'ERROR'
+        $errors.Add($msg)
+    }
+
+    # ------------------------------------------------------------------
+    # A3. CSV exports (forensic analysis + agent reference).
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A3: CSV exports to $backupDir"
+
+    # A3a. victims_export.csv
+    try {
+        $csvPath = Join-Path $backupDir 'victims_export.csv'
+        $sb = [System.Text.StringBuilder]::new()
+        [void]$sb.AppendLine('VictimId,Name,Phone,City,AmountPaid,FinalOutcome,AssignedCloser,DateAdded')
+        foreach ($v in @($VictimData)) {
+            $name = (Get-SqlString $v.Name)  -replace ',', ' '
+            $city = (Get-SqlString $v.City)  -replace ',', ' '
+            [void]$sb.AppendLine(
+                ('{0},{1},{2},{3},{4},{5},{6},{7}' -f `
+                    $v.VictimId, $name, $v.Phone, $city, $v.AmountPaid, `
+                    $v.FinalOutcome, $v.AssignedCloser, $v.DateAdded)
+            )
+        }
+        [System.IO.File]::WriteAllText($csvPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
+        Add-HashRecord -FilePath $csvPath -Role $role
+        $filesCreated++
+        Write-SetupLog "[$role] A3a complete: $csvPath"
+    } catch {
+        $msg = "[$role] A3a FAILED (victims_export.csv): $($_.Exception.Message)"
+        Write-SetupLog $msg 'ERROR'
+        $errors.Add($msg)
+    }
+
+    # A3b. leads_sample.csv (first 1000 leads for reference)
+    try {
+        $csvPath = Join-Path $backupDir 'leads_sample.csv'
+        $sb = [System.Text.StringBuilder]::new()
+        [void]$sb.AppendLine('LeadId,Name,Phone,Source,HeatScore,Status,AssignedAgent,DateAdded')
+        $allLeads = @($LeadData)
+        $limit = [math]::Min(1000, $allLeads.Count)
+        for ($i = 0; $i -lt $limit; $i++) {
+            $l    = $allLeads[$i]
+            $name = (Get-SqlString $l.Name) -replace ',', ' '
+            [void]$sb.AppendLine(
+                ('{0},{1},{2},{3},{4},{5},{6},{7}' -f `
+                    $l.LeadId, $name, $l.Phone, $l.Source, $l.HeatScore, `
+                    $l.Status, $l.AssignedAgent, $l.DateAdded)
+            )
+        }
+        [System.IO.File]::WriteAllText($csvPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
+        Add-HashRecord -FilePath $csvPath -Role $role
+        $filesCreated++
+        Write-SetupLog "[$role] A3b complete: $csvPath"
+    } catch {
+        $msg = "[$role] A3b FAILED (leads_sample.csv): $($_.Exception.Message)"
+        Write-SetupLog $msg 'ERROR'
+        $errors.Add($msg)
+    }
+
+    # A3c. transactions_export.csv
+    try {
+        $csvPath = Join-Path $backupDir 'transactions_export.csv'
+        $sb = [System.Text.StringBuilder]::new()
+        [void]$sb.AppendLine('TxnId,VictimId,Amount,UpiId,BeneficiaryAcct,TxnDate,Status')
+        foreach ($t in @($TransactionData)) {
+            $upi  = (Get-SqlString $t.UpiId)           -replace ',', ' '
+            $acct = (Get-SqlString $t.BeneficiaryAcct) -replace ',', ' '
+            [void]$sb.AppendLine(
+                ('{0},{1},{2},{3},{4},{5},{6}' -f `
+                    $t.TxnId, $t.VictimId, $t.Amount, $upi, $acct, $t.TxnDate, $t.Status)
+            )
+        }
+        [System.IO.File]::WriteAllText($csvPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
+        Add-HashRecord -FilePath $csvPath -Role $role
+        $filesCreated++
+        Write-SetupLog "[$role] A3c complete: $csvPath"
+    } catch {
+        $msg = "[$role] A3c FAILED (transactions_export.csv): $($_.Exception.Message)"
+        Write-SetupLog $msg 'ERROR'
+        $errors.Add($msg)
+    }
+
+    # ------------------------------------------------------------------
+    # A4. CRM web application files under C:\xampp\htdocs\golden_crm\
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A4: CRM web application files"
+    $htdocsDir = "$xamppDir\htdocs\golden_crm"
+    try {
+        New-DirectoryIfMissing $htdocsDir
+    } catch {
+        $msg = "[$role] A4 WARN -- could not create htdocs dir: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
 
-    # ==================================================================
-    # Step 7: CRM web application files under C:\xampp\htdocs\golden_crm\
-    # ==================================================================
-    Write-SetupLog "[$role] Step 7: CRM web application files"
-
-    $htdocsDir = "$xamppDir\htdocs\golden_crm"
-    New-DirectoryIfMissing $htdocsDir
-
-    # ------------------------------------------------------------------
-    # 7a. index.php -- CRM login page
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 7a: index.php"
+    # A4a. index.php -- CRM login page
+    Write-SetupLog "[$role] A4a: index.php"
     try {
         $indexPhp = @'
 <?php
@@ -767,15 +631,13 @@ Password: <input type="password" name="password"><br><br>
         $filesCreated++
         Write-SetupLog "[$role] Created: $indexPath"
     } catch {
-        $msg = "[$role] Step 7a FAILED (index.php): $($_.Exception.Message)"
+        $msg = "[$role] A4a FAILED (index.php): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ------------------------------------------------------------------
-    # 7b. dashboard.php -- main dashboard
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 7b: dashboard.php"
+    # A4b. dashboard.php -- main dashboard
+    Write-SetupLog "[$role] A4b: dashboard.php"
     try {
         $dashboardPhp = @'
 <?php
@@ -805,15 +667,13 @@ $totalAmount = $conn->query("SELECT SUM(amount_paid) as s FROM victims")->fetch_
         $filesCreated++
         Write-SetupLog "[$role] Created: $dashPath"
     } catch {
-        $msg = "[$role] Step 7b FAILED (dashboard.php): $($_.Exception.Message)"
+        $msg = "[$role] A4b FAILED (dashboard.php): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ------------------------------------------------------------------
-    # 7c. victims.php -- victim list page
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 7c: victims.php"
+    # A4c. victims.php -- victim list page
+    Write-SetupLog "[$role] A4c: victims.php"
     try {
         $victimsPhp = @'
 <?php
@@ -850,15 +710,13 @@ $result = $conn->query("SELECT victim_id,name,phone,city,amount_paid,final_outco
         $filesCreated++
         Write-SetupLog "[$role] Created: $victimsPath"
     } catch {
-        $msg = "[$role] Step 7c FAILED (victims.php): $($_.Exception.Message)"
+        $msg = "[$role] A4c FAILED (victims.php): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ------------------------------------------------------------------
-    # 7d. leads.php -- lead pipeline page
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 7d: leads.php"
+    # A4d. leads.php -- lead pipeline page
+    Write-SetupLog "[$role] A4d: leads.php"
     try {
         $leadsPhp = @'
 <?php
@@ -894,15 +752,13 @@ $result = $conn->query("SELECT lead_id,name,phone,source,heat_score,status,assig
         $filesCreated++
         Write-SetupLog "[$role] Created: $leadsPath"
     } catch {
-        $msg = "[$role] Step 7d FAILED (leads.php): $($_.Exception.Message)"
+        $msg = "[$role] A4d FAILED (leads.php): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ------------------------------------------------------------------
-    # 7e. transactions.php -- transaction list page
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 7e: transactions.php"
+    # A4e. transactions.php -- transaction list page
+    Write-SetupLog "[$role] A4e: transactions.php"
     try {
         $transactionsPhp = @'
 <?php
@@ -938,15 +794,13 @@ $result = $conn->query("SELECT txn_id,victim_id,amount,upi_id,beneficiary_acct,t
         $filesCreated++
         Write-SetupLog "[$role] Created: $txnPath"
     } catch {
-        $msg = "[$role] Step 7e FAILED (transactions.php): $($_.Exception.Message)"
+        $msg = "[$role] A4e FAILED (transactions.php): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ------------------------------------------------------------------
-    # 7f. calls.php -- call log page
-    # ------------------------------------------------------------------
-    Write-SetupLog "[$role] Step 7f: calls.php"
+    # A4f. calls.php -- call log page
+    Write-SetupLog "[$role] A4f: calls.php"
     try {
         $callsPhp = @'
 <?php
@@ -983,55 +837,15 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
         $filesCreated++
         Write-SetupLog "[$role] Created: $callsPath"
     } catch {
-        $msg = "[$role] Step 7f FAILED (calls.php): $($_.Exception.Message)"
+        $msg = "[$role] A4f FAILED (calls.php): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ==================================================================
-    # Step 8: Firewall rules
-    # ==================================================================
-    Write-SetupLog "[$role] Step 8: Firewall rules"
-    try {
-        $fwRules = @(
-            @{ Name='GR-Lab-HTTP';  Port=80   },
-            @{ Name='GR-Lab-HTTPS'; Port=443  },
-            @{ Name='GR-Lab-RDP';   Port=3389 },
-            @{ Name='GR-Lab-SMB';   Port=445  },
-            @{ Name='GR-Lab-MySQL'; Port=3306 }
-        )
-        foreach ($rule in $fwRules) {
-            & netsh advfirewall firewall add rule `
-                "name=$($rule.Name)" protocol=TCP dir=in `
-                "localport=$($rule.Port)" action=allow 2>&1 | Out-Null
-            Write-SetupLog "[$role] Firewall rule added: $($rule.Name) -> TCP $($rule.Port)"
-        }
-        Write-SetupLog "[$role] Step 8 complete: firewall rules"
-    } catch {
-        $msg = "[$role] Step 8 WARN -- firewall rules failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ==================================================================
-    # Step 9: Disable SMB signing (training realism)
-    # ==================================================================
-    Write-SetupLog "[$role] Step 9: Disable SMB signing"
-    try {
-        $smbRegPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters'
-        Set-ItemProperty -Path $smbRegPath -Name 'RequireSecuritySignature' -Value 0
-        Set-ItemProperty -Path $smbRegPath -Name 'EnableSecuritySignature'  -Value 0
-        Write-SetupLog "[$role] Step 9 complete: SMB signing disabled"
-    } catch {
-        $msg = "[$role] Step 9 WARN -- SMB signing registry update failed: $($_.Exception.Message)"
-        Write-SetupLog $msg 'WARN'
-        $errors.Add($msg)
-    }
-
-    # ==================================================================
-    # Step 10: Windows Firewall log with brute-force RDP artefact
-    # ==================================================================
-    Write-SetupLog "[$role] Step 10: Firewall log pfirewall.log"
+    # ------------------------------------------------------------------
+    # A5. Windows Firewall log with brute-force RDP artefact (47 DROP + 1 ALLOW)
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A5: Firewall log pfirewall.log"
     try {
         $fwLogDir = "$env:SystemDrive\Windows\System32\LogFiles\Firewall"
         New-DirectoryIfMissing $fwLogDir
@@ -1047,14 +861,13 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
         [void]$sb.AppendLine('#Fields: date time action protocol src-ip dst-ip src-port dst-port size tcpflags tcpsyn tcpack tcpwin icmptype icmpcode info path')
         [void]$sb.AppendLine('')
 
-        # Generate 47 DROP entries spread from 23:08:11 to 23:13:55 (345 s window).
+        # 47 DROP entries spread from 23:08:11 to 23:13:55 (344 s window).
         # Entry 48 is the ALLOW (successful brute-force entry) at 23:14:22.
         $baseTime   = [datetime]'2026-04-17 23:08:11'
         $totalDrop  = 47
-        $windowSecs = 344   # 23:13:55 - 23:08:11 = 344 s
+        $windowSecs = 344
 
         for ($n = 0; $n -lt $totalDrop; $n++) {
-            # Spread drops roughly evenly; last drop at exactly 344 s offset.
             if ($totalDrop -gt 1) {
                 $offsetSecs = [int][math]::Round(($n / ($totalDrop - 1)) * $windowSecs)
             } else {
@@ -1068,7 +881,6 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
             [void]$sb.AppendLine($entryLine)
         }
 
-        # The successful connection.
         $allowTime = [datetime]'2026-04-17 23:14:22'
         $allowLine = '{0} {1} ALLOW TCP {2} {3} 54268 3389 48 S 0 0 65535 - - - RECEIVE' -f `
             $allowTime.ToString('yyyy-MM-dd'), $allowTime.ToString('HH:mm:ss'), `
@@ -1078,28 +890,161 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
         [System.IO.File]::WriteAllText($fwLogPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
         Add-HashRecord -FilePath $fwLogPath -Role $role
         $filesCreated++
-        Write-SetupLog "[$role] Created: $fwLogPath (47 DROPs + 1 ALLOW from $attackerIp)"
+        Write-SetupLog "[$role] A5 complete: $fwLogPath (47 DROPs + 1 ALLOW from $attackerIp)"
     } catch {
-        $msg = "[$role] Step 10 FAILED (pfirewall.log): $($_.Exception.Message)"
+        $msg = "[$role] A5 FAILED (pfirewall.log): $($_.Exception.Message)"
         Write-SetupLog $msg 'ERROR'
         $errors.Add($msg)
     }
 
-    # ==================================================================
-    # Step 11: D:\Victims share + victims_master.xlsx copy
-    # ==================================================================
-    Write-SetupLog "[$role] Step 11: Victims share"
+    # ------------------------------------------------------------------
+    # A6. Apache access.log + MySQL general query log (connection traces)
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A6: connection traces (access.log + mysql-general.log)"
+
+    # A6a. Apache access.log
+    try {
+        $apacheLogDir = "$xamppDir\apache\logs"
+        New-DirectoryIfMissing $apacheLogDir
+        $accessLogPath = Join-Path $apacheLogDir 'access.log'
+
+        $agents = @(
+            @{ Ip='192.168.10.11'; User='rahul.s'; Page='dashboard.php' },
+            @{ Ip='192.168.10.22'; User='priya.v'; Page='leads.php' },
+            @{ Ip='192.168.10.33'; User='amit.p';  Page='calls.php' },
+            @{ Ip='192.168.10.44'; User='sneha.i'; Page='transactions.php' },
+            @{ Ip='192.168.10.55'; User='vikas.n'; Page='victims.php' }
+        )
+        $months = @('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+
+        $sb = [System.Text.StringBuilder]::new()
+        # ~50 routine entries over the last 14 days (Apr 4 - Apr 16).
+        $rng = New-Object System.Random 4172026
+        for ($d = 0; $d -lt 14; $d++) {
+            $day = (([datetime]'2026-04-04').AddDays($d))
+            $perDay = $rng.Next(3, 5)
+            for ($e = 0; $e -lt $perDay; $e++) {
+                $a  = $agents[$rng.Next(0, $agents.Count)]
+                $hh = $rng.Next(9, 19)
+                $mm = $rng.Next(0, 60)
+                $ss = $rng.Next(0, 60)
+                $sz = $rng.Next(3000, 9000)
+                $ts = ('{0:00}/{1}/{2}:{3:00}:{4:00}:{5:00} +0530' -f `
+                    $day.Day, $months[$day.Month - 1], $day.Year, $hh, $mm, $ss)
+                [void]$sb.AppendLine(
+                    ('{0} - {1} [{2}] "GET /golden_crm/{3} HTTP/1.1" 200 {4}' -f `
+                        $a.Ip, $a.User, $ts, $a.Page, $sz)
+                )
+            }
+        }
+
+        # Real connection evidence entries at the end (Apr 17).
+        [void]$sb.AppendLine('192.168.10.11 - rahul.s [17/Apr/2026:09:14:22 +0530] "GET /golden_crm/dashboard.php HTTP/1.1" 200 4521')
+        [void]$sb.AppendLine('192.168.10.22 - priya.v [17/Apr/2026:09:31:07 +0530] "GET /golden_crm/leads.php HTTP/1.1" 200 8934')
+        [void]$sb.AppendLine('192.168.10.33 - amit.p  [17/Apr/2026:09:45:33 +0530] "GET /golden_crm/calls.php HTTP/1.1" 200 6211')
+        [void]$sb.AppendLine('192.168.10.44 - sneha.i [17/Apr/2026:10:02:18 +0530] "GET /golden_crm/transactions.php HTTP/1.1" 200 7843')
+        [void]$sb.AppendLine('192.168.10.55 - vikas.n [17/Apr/2026:02:14:09 +0530] "GET /golden_crm/admin/users.php HTTP/1.1" 200 3102')
+        [void]$sb.AppendLine('192.168.10.50 - arjun.m [17/Apr/2026:08:47:55 +0530] "GET /golden_crm/victims.php?export=csv HTTP/1.1" 200 94521')
+
+        [System.IO.File]::WriteAllText($accessLogPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
+        Add-HashRecord -FilePath $accessLogPath -Role $role
+        $filesCreated++
+        Write-SetupLog "[$role] A6a complete: $accessLogPath"
+    } catch {
+        $msg = "[$role] A6a FAILED (access.log): $($_.Exception.Message)"
+        Write-SetupLog $msg 'ERROR'
+        $errors.Add($msg)
+    }
+
+    # A6b. MySQL general query log
+    try {
+        $mysqlDataDir = "$xamppDir\mysql\data"
+        New-DirectoryIfMissing $mysqlDataDir
+        $genLogPath = Join-Path $mysqlDataDir 'mysql-general.log'
+
+        $sb = [System.Text.StringBuilder]::new()
+        [void]$sb.AppendLine('mysqld, Version: 8.2.12 (MySQL Community Server). started with:')
+        [void]$sb.AppendLine('Time                 Id Command    Argument')
+        [void]$sb.AppendLine("2026-04-17T09:14:22.000000Z   50 Query SELECT * FROM victims WHERE assigned_closer='rahul.s'")
+        [void]$sb.AppendLine("2026-04-17T09:31:07.000000Z   51 Query SELECT * FROM leads WHERE status='HOT' LIMIT 500")
+        [void]$sb.AppendLine("2026-04-17T09:45:33.000000Z   52 Query SELECT * FROM call_logs WHERE agent_id='amit.p'")
+        [void]$sb.AppendLine("2026-04-17T10:02:18.000000Z   53 Query SELECT txn_id,amount,upi_id FROM transactions ORDER BY id DESC")
+        [void]$sb.AppendLine("2026-04-17T23:14:09.000000Z   54 Query SELECT COUNT(*) FROM transactions WHERE status='CONFIRMED'")
+        [void]$sb.AppendLine("2026-04-17T23:42:11.000000Z   55 Query SELECT * FROM users")
+        [void]$sb.AppendLine("2026-04-17T23:47:00.000000Z   56 Query DELETE FROM victims WHERE final_outcome='REFUNDED'")
+        [void]$sb.AppendLine("2026-04-17T23:52:34.000000Z   57 Query DROP TABLE IF EXISTS call_logs")
+
+        [System.IO.File]::WriteAllText($genLogPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
+        Add-HashRecord -FilePath $genLogPath -Role $role
+        $filesCreated++
+        Write-SetupLog "[$role] A6b complete: $genLogPath"
+    } catch {
+        $msg = "[$role] A6b FAILED (mysql-general.log): $($_.Exception.Message)"
+        Write-SetupLog $msg 'ERROR'
+        $errors.Add($msg)
+    }
+
+    # ------------------------------------------------------------------
+    # A7. Call recording WAV stubs under D:\CRM\uploads\
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A7: Call recording WAV stubs"
+    try {
+        $uploadsDir = if (Test-Path 'D:\') { 'D:\CRM\uploads' } else { "$env:SystemDrive\CRM\uploads" }
+        New-DirectoryIfMissing $uploadsDir
+
+        $emptyBytes   = [byte[]]@()
+        $stubsCreated = 0
+
+        foreach ($log in ($CallLogData | Where-Object { $_.RecordingFilename })) {
+            try {
+                $wavPath = Join-Path $uploadsDir $log.RecordingFilename
+                if (-not (Test-Path $wavPath)) {
+                    [System.IO.File]::WriteAllBytes($wavPath, $emptyBytes)
+                    Add-HashRecord -FilePath $wavPath -Role $role
+                    $stubsCreated++
+                }
+            } catch {
+                Write-SetupLog "[$role] WAV stub WARN (skipping $($log.RecordingFilename)): $($_.Exception.Message)" 'WARN'
+            }
+        }
+
+        $filesCreated += $stubsCreated
+        Write-SetupLog "[$role] A7 complete: $stubsCreated WAV stubs created in $uploadsDir"
+    } catch {
+        $msg = "[$role] A7 FAILED (WAV stubs): $($_.Exception.Message)"
+        Write-SetupLog $msg 'ERROR'
+        $errors.Add($msg)
+    }
+
+    # ------------------------------------------------------------------
+    # A8. SMB shares 'old' (backup) and 'Victims', plus victims_export copy.
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A8: SMB shares 'old' + 'Victims'"
+
+    # A8a. Share the backup dir as 'old' (Everyone:FULL for training realism).
+    try {
+        New-DirectoryIfMissing $backupDir
+        & cmd /c "net share old /delete" 2>&1 | Out-Null
+        $shareResult = & cmd /c "net share old=`"$backupDir`" /REMARK:`"Backup archive`" /GRANT:Everyone,FULL" 2>&1
+        Write-SetupLog "[$role] SMB share 'old' result: $shareResult"
+        Write-SetupLog "[$role] A8a complete: SMB share 'old' -> $backupDir"
+    } catch {
+        $msg = "[$role] A8a WARN -- SMB share 'old' failed: $($_.Exception.Message)"
+        Write-SetupLog $msg 'WARN'
+        $errors.Add($msg)
+    }
+
+    # A8b. Share the Victims dir (read-only) and copy victims_export.csv into it.
     try {
         $victimsDir = if (Test-Path 'D:\') { 'D:\Victims' } else { "$env:SystemDrive\Victims" }
         New-DirectoryIfMissing $victimsDir
 
-        # Copy victims_master.xlsx if it exists on the manager drive.
+        # Copy victims_master.xlsx if present on the manager drive.
         $vmSource = if (Test-Path 'D:\Manager\victims_master.xlsx') {
             'D:\Manager\victims_master.xlsx'
         } else {
             "$env:SystemDrive\Manager\victims_master.xlsx"
         }
-
         if (Test-Path $vmSource) {
             Copy-Item $vmSource $victimsDir -Force
             $copiedXlsx = Join-Path $victimsDir 'victims_master.xlsx'
@@ -1110,51 +1055,180 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
             Write-SetupLog "[$role] victims_master.xlsx not found at $vmSource -- skipping copy" 'WARN'
         }
 
-        # Create the SMB share (read-only).
-        & net share "Victims=${victimsDir}" '/GRANT:Everyone,READ' 2>&1 | Out-Null
-        Write-SetupLog "[$role] Step 11 complete: SMB share Victims -> $victimsDir"
+        # Copy the victims_export.csv evidence file into the Victims share.
+        $vmExportSrc = Join-Path $backupDir 'victims_export.csv'
+        if (Test-Path $vmExportSrc) {
+            Copy-Item $vmExportSrc $victimsDir -Force
+            Write-SetupLog "[$role] Copied victims_export.csv to $victimsDir"
+        }
+
+        & cmd /c "net share Victims /delete" 2>&1 | Out-Null
+        $shareResult2 = & cmd /c "net share Victims=`"$victimsDir`" /REMARK:`"Victim data`" /GRANT:Everyone,READ" 2>&1
+        Write-SetupLog "[$role] SMB share 'Victims' result: $shareResult2"
+        Write-SetupLog "[$role] A8b complete: SMB share 'Victims' -> $victimsDir"
     } catch {
-        $msg = "[$role] Step 11 WARN -- Victims share failed: $($_.Exception.Message)"
+        $msg = "[$role] A8b WARN -- Victims share failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
 
-    # ==================================================================
-    # Step 12: D:\CRM\uploads\ -- WAV recording stubs
-    # ==================================================================
-    Write-SetupLog "[$role] Step 12: Call recording WAV stubs"
+    # ------------------------------------------------------------------
+    # A9. Firewall rules + disable SMB signing (training realism).
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] A9: firewall rules + SMB-signing registry"
+
+    # A9a. Firewall rules for all lab service ports.
     try {
-        $uploadsDir = if (Test-Path 'D:\') { 'D:\CRM\uploads' } else { "$env:SystemDrive\CRM\uploads" }
-        New-DirectoryIfMissing $uploadsDir
-
-        $emptyBytes  = [byte[]]@()
-        $stubsCreated = 0
-
-        foreach ($log in ($CallLogData | Where-Object { $_.RecordingFilename })) {
-            try {
-                $wavPath = Join-Path $uploadsDir $log.RecordingFilename
-                if (-not (Test-Path $wavPath)) {
-                    [System.IO.File]::WriteAllBytes($wavPath, $emptyBytes)
-                    Add-HashRecord -FilePath $wavPath -Role 'CRM-SERVER'
-                    $stubsCreated++
-                }
-            } catch {
-                # Skip individual stub failures quietly; report summary.
-                Write-SetupLog "[$role] WAV stub WARN (skipping $($log.RecordingFilename)): $($_.Exception.Message)" 'WARN'
-            }
+        $fwRules = @(
+            @{ Name='GR-Lab-HTTP';  Port=80   },
+            @{ Name='GR-Lab-HTTPS'; Port=443  },
+            @{ Name='GR-Lab-RDP';   Port=3389 },
+            @{ Name='GR-Lab-SMB';   Port=445  },
+            @{ Name='GR-Lab-MySQL'; Port=3306 }
+        )
+        foreach ($rule in $fwRules) {
+            & netsh advfirewall firewall add rule `
+                "name=$($rule.Name)" protocol=TCP dir=in `
+                "localport=$($rule.Port)" action=allow profile=any 2>&1 | Out-Null
+            Write-SetupLog "[$role] Firewall rule added: $($rule.Name) -> TCP $($rule.Port)"
         }
-
-        Write-SetupLog "[$role] Step 12 complete: $stubsCreated WAV stubs created in $uploadsDir"
-        $filesCreated += $stubsCreated
+        Write-SetupLog "[$role] A9a complete: firewall rules"
     } catch {
-        $msg = "[$role] Step 12 FAILED (WAV stubs): $($_.Exception.Message)"
-        Write-SetupLog $msg 'ERROR'
+        $msg = "[$role] A9a WARN -- firewall rules failed: $($_.Exception.Message)"
+        Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
 
-    # ==================================================================
+    # A9b. Disable SMB signing.
+    try {
+        $smbRegPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters'
+        Set-ItemProperty -Path $smbRegPath -Name 'RequireSecuritySignature' -Value 0
+        Set-ItemProperty -Path $smbRegPath -Name 'EnableSecuritySignature'  -Value 0
+        Write-SetupLog "[$role] A9b complete: SMB signing disabled"
+    } catch {
+        $msg = "[$role] A9b WARN -- SMB signing registry update failed: $($_.Exception.Message)"
+        Write-SetupLog $msg 'WARN'
+        $errors.Add($msg)
+    }
+
+    Write-SetupLog "[$role] ===== PHASE A complete: $filesCreated file artefacts written ====="
+
+    # ##################################################################
+    # PHASE B -- MySQL (best-effort, 3 tiers, non-fatal if all fail)
+    # ##################################################################
+    Write-SetupLog "[$role] ===== PHASE B: MySQL best-effort (non-fatal) ====="
+
+    # ------------------------------------------------------------------
+    # B1. Optionally install XAMPP (only if not already present).
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] B1: XAMPP presence check / install"
+    try {
+        if (Test-Path "$xamppDir\mysql\bin\mysqld.exe") {
+            Write-SetupLog "[$role] XAMPP already present at $xamppDir -- skipping download"
+        } else {
+            $xamppInstaller = "$env:TEMP\xampp-installer.exe"
+            # Try ApacheFriends direct URL first, SourceForge as fallback
+            $xamppUrls = @(
+                'https://www.apachefriends.org/xampp-files/8.2.12/xampp-windows-x64-8.2.12-0-VS16-installer.exe',
+                'https://sourceforge.net/projects/xampp/files/XAMPP%20Windows/8.2.12/xampp-windows-x64-8.2.12-0-VS16-installer.exe/download',
+                'https://github.com/nicktacular/xampp-installer-helper/releases/download/v8.2.12/xampp-windows-x64-8.2.12-installer.exe'
+            )
+            $downloaded = $false
+            foreach ($xamppUrl in $xamppUrls) {
+                try {
+                    Write-SetupLog "[$role] Trying: $xamppUrl"
+                    Invoke-WebRequest -Uri $xamppUrl -OutFile $xamppInstaller -UseBasicParsing -TimeoutSec 300
+                    if ((Test-Path $xamppInstaller) -and (Get-Item $xamppInstaller).Length -gt 10MB) {
+                        $downloaded = $true
+                        break
+                    }
+                } catch {
+                    Write-SetupLog "[$role] URL failed: $($_.Exception.Message)" 'WARN'
+                }
+            }
+            if (-not $downloaded) { throw "All XAMPP download URLs failed" }
+
+            Write-SetupLog "[$role] Downloading XAMPP 8.2.12 (~170 MB)..."
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            $oldProgress = $ProgressPreference
+            $ProgressPreference = 'SilentlyContinue'
+            try {
+                Invoke-WebRequest -Uri $xamppUrl -OutFile $xamppInstaller -UseBasicParsing -TimeoutSec 600
+            } finally {
+                $ProgressPreference = $oldProgress
+            }
+
+            Write-SetupLog "[$role] Installing XAMPP silently..."
+            $proc = Start-Process -FilePath $xamppInstaller `
+                -ArgumentList '--mode unattended --disable-components xampp_perl,xampp_phpmyadmin,xampp_filezilla,xampp_mercury,xampp_tomcat' `
+                -Wait -PassThru
+            if ($proc.ExitCode -ne 0) {
+                throw "XAMPP installer exited with code $($proc.ExitCode)"
+            }
+            Write-SetupLog "[$role] XAMPP installed"
+        }
+    } catch {
+        $msg = "[$role] B1 WARN -- XAMPP install failed (non-fatal): $($_.Exception.Message)"
+        Write-SetupLog $msg 'WARN'
+        $errors.Add($msg)
+    }
+
+    # ------------------------------------------------------------------
+    # B2. Start MySQL (3-tier) and import the already-written dump file.
+    # ------------------------------------------------------------------
+    Write-SetupLog "[$role] B2: start MySQL (3-tier) + import dump"
+    $mysqlAvailable = $false
+    try {
+        $resolvedMysql = Start-LabMySQL -XamppDir $xamppDir
+        if ($resolvedMysql) {
+            $mysql = $resolvedMysql
+            $mysqlAvailable = $true
+            Write-SetupLog "[$role] MySQL available -- using $mysql"
+        } else {
+            $msg = "[$role] B2 WARN -- MySQL could not be started (all tiers failed); Phase A artefacts already present"
+            Write-SetupLog $msg 'WARN'
+            $errors.Add($msg)
+        }
+    } catch {
+        $msg = "[$role] B2 WARN -- MySQL start failed (non-fatal): $($_.Exception.Message)"
+        Write-SetupLog $msg 'WARN'
+        $errors.Add($msg)
+    }
+
+    # ------------------------------------------------------------------
+    # B3. Import the dump file we already wrote in Phase A (A2).
+    # ------------------------------------------------------------------
+    if ($mysqlAvailable -and (Test-Path $sqlDumpFile)) {
+        Write-SetupLog "[$role] B3: importing $sqlDumpFile into MySQL"
+        try {
+            # Preferred path: pipe the dump file through cmd to mysql stdin.
+            $importCmd = "cmd /c `"`"$mysql`" -u root < `"$sqlDumpFile`"`" 2>&1"
+            $result = Invoke-Expression $importCmd
+            if ($LASTEXITCODE -ne 0) {
+                throw "cmd import returned exit $LASTEXITCODE : $result"
+            }
+            Write-SetupLog "[$role] B3 complete: dump imported via cmd redirect"
+        } catch {
+            Write-SetupLog "[$role] B3 cmd-redirect import failed: $($_.Exception.Message) -- retrying via Invoke-MySql" 'WARN'
+            try {
+                $sqlContent = Get-Content $sqlDumpFile -Raw
+                Invoke-MySql -Sql $sqlContent -MysqlExe $mysql
+                Write-SetupLog "[$role] B3 complete: dump imported via Invoke-MySql"
+            } catch {
+                $msg = "[$role] B3 WARN -- dump import failed (non-fatal): $($_.Exception.Message)"
+                Write-SetupLog $msg 'WARN'
+                $errors.Add($msg)
+            }
+        }
+    } else {
+        Write-SetupLog "[$role] B3 SKIP -- MySQL unavailable; trainees use the SQL dump + CSV exports in $backupDir" 'WARN'
+    }
+
+    Write-SetupLog "[$role] ===== PHASE B complete (mysqlAvailable=$mysqlAvailable) ====="
+
+    # ##################################################################
     # Final status
-    # ==================================================================
+    # ##################################################################
     $status = if ($errors.Count -eq 0) { 'DONE' }
               elseif ($filesCreated -gt 0) { 'DONE_WITH_CONCERNS' }
               else { 'BLOCKED' }
