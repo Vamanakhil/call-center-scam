@@ -100,6 +100,19 @@ function Get-SqlString {
     return ([string]$Value) -replace "'", "''"
 }
 
+function Get-SqlNum {
+    # Safely convert any numeric type to a plain decimal string for SQL
+    param($Value)
+    if ($null -eq $Value) { return '0' }
+    try { return ([decimal]$Value).ToString('0.##') } catch { return '0' }
+}
+
+function Get-SqlInt {
+    param($Value)
+    if ($null -eq $Value) { return '0' }
+    try { return ([int]$Value).ToString() } catch { return '0' }
+}
+
 # ---------------------------------------------------------------------------
 # Helper: build the complete golden_crm SQL dump as a single string.
 # Schema + all victim/lead/transaction/call_log/users INSERTs, batched.
@@ -217,7 +230,7 @@ function Build-GoldenCrmDump {
             $notes = Get-SqlString $v.Notes
             $rows.Add(
                 "('$($v.VictimId)','$name','$phone','$email','$city'," +
-                "$($v.AmountPaid),$($v.InitialDeposit)," +
+                "$(Get-SqlNum $v.AmountPaid),$(Get-SqlNum $v.InitialDeposit)," +
                 "'$($v.FinalOutcome)','$($v.AssignedCloser)'," +
                 "'$($v.DateAdded)','$($v.Status)','$notes')"
             )
@@ -244,8 +257,8 @@ function Build-GoldenCrmDump {
             $email = Get-SqlString $l.Email
             $agent = Get-SqlString $l.AssignedAgent
             $rows.Add(
-                "($($l.LeadId),'$name','$phone','$email'," +
-                "'$($l.Source)',$($l.HeatScore),'$($l.Status)'," +
+                "($(Get-SqlInt $l.LeadId),'$name','$phone','$email'," +
+                "'$($l.Source)',$(Get-SqlInt $l.HeatScore),'$($l.Status)'," +
                 "'$agent','$($l.DateAdded)')"
             )
         }
@@ -270,7 +283,7 @@ function Build-GoldenCrmDump {
             $acct  = Get-SqlString $t.BeneficiaryAcct
             $notes = Get-SqlString $t.Notes
             $rows.Add(
-                "($($t.TxnId),'$($t.VictimId)',$($t.Amount)," +
+                "($(Get-SqlInt $t.TxnId),'$($t.VictimId)',$(Get-SqlNum $t.Amount)," +
                 "'$upi','$acct','$($t.TxnDate)'," +
                 "'$($t.Status)','$notes')"
             )
@@ -295,8 +308,8 @@ function Build-GoldenCrmDump {
             $agent = Get-SqlString $c.AgentId
             $recf  = Get-SqlString $c.RecordingFilename
             $rows.Add(
-                "($($c.LogId),'$agent','$($c.VictimId)'," +
-                "$($c.DurationSeconds),'$recf'," +
+                "($(Get-SqlInt $c.LogId),'$agent','$($c.VictimId)'," +
+                "$(Get-SqlInt $c.DurationSeconds),'$recf'," +
                 "'$($c.CallDate)','$($c.CallType)','$($c.Outcome)')"
             )
         }
@@ -518,8 +531,8 @@ function Invoke-RoleSetup {
             $city = (Get-SqlString $v.City)  -replace ',', ' '
             [void]$sb.AppendLine(
                 ('{0},{1},{2},{3},{4},{5},{6},{7}' -f `
-                    $v.VictimId, $name, $v.Phone, $city, $v.AmountPaid, `
-                    $v.FinalOutcome, $v.AssignedCloser, $v.DateAdded)
+                    [string]$v.VictimId, $name, [string]$v.Phone, $city, (Get-SqlNum $v.AmountPaid), `
+                    [string]$v.FinalOutcome, [string]$v.AssignedCloser, [string]$v.DateAdded)
             )
         }
         [System.IO.File]::WriteAllText($csvPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
@@ -544,8 +557,8 @@ function Invoke-RoleSetup {
             $name = (Get-SqlString $l.Name) -replace ',', ' '
             [void]$sb.AppendLine(
                 ('{0},{1},{2},{3},{4},{5},{6},{7}' -f `
-                    $l.LeadId, $name, $l.Phone, $l.Source, $l.HeatScore, `
-                    $l.Status, $l.AssignedAgent, $l.DateAdded)
+                    [string]$l.LeadId, $name, [string]$l.Phone, [string]$l.Source, [string]$l.HeatScore, `
+                    [string]$l.Status, [string]$l.AssignedAgent, [string]$l.DateAdded)
             )
         }
         [System.IO.File]::WriteAllText($csvPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
@@ -568,7 +581,7 @@ function Invoke-RoleSetup {
             $acct = (Get-SqlString $t.BeneficiaryAcct) -replace ',', ' '
             [void]$sb.AppendLine(
                 ('{0},{1},{2},{3},{4},{5},{6}' -f `
-                    $t.TxnId, $t.VictimId, $t.Amount, $upi, $acct, $t.TxnDate, $t.Status)
+                    [string]$t.TxnId, [string]$t.VictimId, (Get-SqlNum $t.Amount), [string]$upi, [string]$acct, [string]$t.TxnDate, [string]$t.Status)
             )
         }
         [System.IO.File]::WriteAllText($csvPath, $sb.ToString(), [System.Text.Encoding]::UTF8)
@@ -1024,9 +1037,17 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
     # A8a. Share the backup dir as 'old' (Everyone:FULL for training realism).
     try {
         New-DirectoryIfMissing $backupDir
-        & cmd /c "net share old /delete" 2>&1 | Out-Null
-        $shareResult = & cmd /c "net share old=`"$backupDir`" /REMARK:`"Backup archive`" /GRANT:Everyone,FULL" 2>&1
-        Write-SetupLog "[$role] SMB share 'old' result: $shareResult"
+        # Delete silently -- it may not exist yet, that is OK
+        & cmd /c "net share old /delete /y" 2>&1 | Out-Null
+        Start-Sleep -Seconds 1
+        # Create the share (use short path with no spaces if possible)
+        $shareResult = & cmd /c "net share old=$backupDir /REMARK:BackupArchive /GRANT:Everyone,FULL" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            # Fallback: use subst or just skip share creation
+            Write-SetupLog "[CRM-SERVER] net share old warning (non-fatal): $shareResult" 'WARN'
+        } else {
+            Write-SetupLog "[CRM-SERVER] SMB share old created: $backupDir"
+        }
         Write-SetupLog "[$role] A8a complete: SMB share 'old' -> $backupDir"
     } catch {
         $msg = "[$role] A8a WARN -- SMB share 'old' failed: $($_.Exception.Message)"
@@ -1148,16 +1169,6 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
             }
             if (-not $downloaded) { throw "All XAMPP download URLs failed" }
 
-            Write-SetupLog "[$role] Downloading XAMPP 8.2.12 (~170 MB)..."
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $oldProgress = $ProgressPreference
-            $ProgressPreference = 'SilentlyContinue'
-            try {
-                Invoke-WebRequest -Uri $xamppUrl -OutFile $xamppInstaller -UseBasicParsing -TimeoutSec 600
-            } finally {
-                $ProgressPreference = $oldProgress
-            }
-
             Write-SetupLog "[$role] Installing XAMPP silently..."
             $proc = Start-Process -FilePath $xamppInstaller `
                 -ArgumentList '--mode unattended --disable-components xampp_perl,xampp_phpmyadmin,xampp_filezilla,xampp_mercury,xampp_tomcat' `
@@ -1196,32 +1207,50 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
     }
 
     # ------------------------------------------------------------------
-    # B3. Import the dump file we already wrote in Phase A (A2).
+    # B3. Import data into MySQL.
+    # If the dump file was written in A2, pipe it in. Otherwise inject schema + data directly.
     # ------------------------------------------------------------------
-    if ($mysqlAvailable -and (Test-Path $sqlDumpFile)) {
-        Write-SetupLog "[$role] B3: importing $sqlDumpFile into MySQL"
-        try {
-            # Preferred path: pipe the dump file through cmd to mysql stdin.
-            $importCmd = "cmd /c `"`"$mysql`" -u root < `"$sqlDumpFile`"`" 2>&1"
-            $result = Invoke-Expression $importCmd
-            if ($LASTEXITCODE -ne 0) {
-                throw "cmd import returned exit $LASTEXITCODE : $result"
-            }
-            Write-SetupLog "[$role] B3 complete: dump imported via cmd redirect"
-        } catch {
-            Write-SetupLog "[$role] B3 cmd-redirect import failed: $($_.Exception.Message) -- retrying via Invoke-MySql" 'WARN'
+    if ($mysqlAvailable) {
+        if (Test-Path $sqlDumpFile) {
+            Write-SetupLog "[$role] B3: importing $sqlDumpFile into MySQL"
             try {
-                $sqlContent = Get-Content $sqlDumpFile -Raw
-                Invoke-MySql -Sql $sqlContent -MysqlExe $mysql
-                Write-SetupLog "[$role] B3 complete: dump imported via Invoke-MySql"
+                # Preferred path: pipe the dump file through cmd to mysql stdin.
+                $importCmd = "cmd /c `"`"$mysql`" -u root < `"$sqlDumpFile`"`" 2>&1"
+                $result = Invoke-Expression $importCmd
+                if ($LASTEXITCODE -ne 0) {
+                    throw "cmd import returned exit $LASTEXITCODE : $result"
+                }
+                Write-SetupLog "[$role] B3 complete: dump imported via cmd redirect"
             } catch {
-                $msg = "[$role] B3 WARN -- dump import failed (non-fatal): $($_.Exception.Message)"
+                Write-SetupLog "[$role] B3 cmd-redirect failed: $($_.Exception.Message) -- retrying via Invoke-MySql" 'WARN'
+                try {
+                    $sqlContent = [System.IO.File]::ReadAllText($sqlDumpFile)
+                    Invoke-MySql -Sql $sqlContent -MysqlExe $mysql
+                    Write-SetupLog "[$role] B3 complete: dump imported via Invoke-MySql"
+                } catch {
+                    $msg = "[$role] B3 WARN -- dump import failed: $($_.Exception.Message)"
+                    Write-SetupLog $msg 'WARN'
+                    $errors.Add($msg)
+                }
+            }
+        } else {
+            Write-SetupLog "[$role] B3: dump file missing -- injecting schema+data directly via Invoke-MySql"
+            try {
+                $directDump = Build-GoldenCrmDump -Victims $VictimData -Leads $LeadData -Transactions $TransactionData -CallLogs $CallLogData
+                Invoke-MySql -Sql $directDump -MysqlExe $mysql
+                Write-SetupLog "[$role] B3 direct inject complete"
+                # Also write the dump file now for trainees
+                [System.IO.File]::WriteAllText($sqlDumpFile, $directDump, [System.Text.Encoding]::UTF8)
+                Add-HashRecord -FilePath $sqlDumpFile -Role $role
+                $filesCreated++
+            } catch {
+                $msg = "[$role] B3 direct inject failed: $($_.Exception.Message)"
                 Write-SetupLog $msg 'WARN'
                 $errors.Add($msg)
             }
         }
     } else {
-        Write-SetupLog "[$role] B3 SKIP -- MySQL unavailable; trainees use the SQL dump + CSV exports in $backupDir" 'WARN'
+        Write-SetupLog "[$role] B3 SKIP -- MySQL unavailable; trainees use CSV exports in $backupDir" 'WARN'
     }
 
     Write-SetupLog "[$role] ===== PHASE B complete (mysqlAvailable=$mysqlAvailable) ====="
