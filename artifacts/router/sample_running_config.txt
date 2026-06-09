@@ -1,0 +1,76 @@
+! TP-Link TL-WR940N running-config
+! TFTP-exported 18-Apr-2026 11:30 IST
+! Synthetic for training
+
+version 1.0
+hostname TP-LINK
+!
+! --- WAN interface (cable from ISP) ---
+interface WAN
+  ip address dhcp
+  ! WAN IP assigned by ISP: 203.45.78.91 / 255.255.255.0
+  ! Gateway: 203.45.78.1
+  ! DNS: 8.8.8.8, 1.1.1.1
+  no shutdown
+!
+! --- LAN interface (to switch) ---
+interface LAN
+  ip address 192.168.10.1 255.255.255.0
+  no shutdown
+!
+! --- DHCP server ---
+ip dhcp pool LAN-LAN
+  network 192.168.10.0 255.255.255.0
+  default-router 192.168.10.1
+  dns-server 8.8.8.8 1.1.1.1
+  lease 0 24
+!
+! --- Static DHCP reservations ---
+ip dhcp pool AGENT-05
+  host 192.168.10.55
+  client-identifier 01:AA:BB:CC:55:66:77
+  ! Vikas N. — never loses his IP
+ip dhcp pool PRINTER
+  host 192.168.10.30
+  client-identifier 01:AA:BB:CC:30:30:30
+!
+! --- NAT (port forwarding) ---
+! Forward RDP to the server (for Arjun's remote access from home)
+ip nat inside source static tcp 192.168.10.100 3389 interface WAN 3389
+! Forward HTTP to the server (for the public CRM website)
+ip nat inside source static tcp 192.168.10.100 80 interface WAN 80
+! Forward HTTPS to the server (unused, but present)
+ip nat inside source static tcp 192.168.10.100 443 interface WAN 443
+!
+! --- Firewall rules (allow out, block in by default) ---
+ip access-list extended WAN-IN
+  permit tcp any host 203.45.78.91 eq 3389
+  permit tcp any host 203.45.78.91 eq 80
+  deny   ip any any log
+!
+! --- DNS resolver cache (frozen at 17-Apr-2026 02:00) ---
+ip dns server
+t.me                                A    149.154.167.99
+web.telegram.org                    A    149.154.167.99
+goldenreturns.example               A    192.168.10.100
+linkedin.com                        A    13.107.42.14
+sales.linkedin.com                  A    13.107.42.14
+facebook.com                        A    157.240.22.35
+business.facebook.com               A    157.240.22.35
+anydesk.com                         A    54.93.114.118
+relay.anydesk.com                   A    103.41.218.91
+static-cdn.zoom.us                  A    3.18.108.140
+hdfcbank.com                        A    23.61.194.142
+npci.org.in                         A    14.140.135.66
+drive.google.com                    A    142.250.195.78
+mail.google.com                     A    142.250.195.78
+!
+! --- Current active sessions ---
+! RDP from MANAGER-PC (192.168.10.50) to CRM-SERVER (192.168.10.100:3389) — session 5
+! RDP from AnyDesk relay (103.41.218.91) to CRM-SERVER:3389 — session 6
+!
+! --- Wireless ---
+! SSID: GoldenReturns-Office  (WPA2-PSK, password: Gr2026Office!)
+! Channel: 6, hidden: no
+!
+end

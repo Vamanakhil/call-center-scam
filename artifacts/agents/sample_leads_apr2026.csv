@@ -1,0 +1,21 @@
+lead_id,first_name,last_name,phone,email,city,job_title,linkedin_url,heat_score,status
+L00001,Suresh,Pillai,9000000001,suresh.pillai@gmail.com,Mumbai,CA,https://linkedin.com/in/suresh-pillai,87,HOT
+L00002,Anita,Joshi,9000000002,anita.joshi@gmail.com,Delhi,Doctor,https://linkedin.com/in/anita-joshi,92,HOT
+L00003,Ramesh,Kapoor,9000000003,ramesh.kapoor@gmail.com,Bangalore,Engineer,https://linkedin.com/in/ramesh-kapoor,78,HOT
+L00004,Kavita,Reddy,9000000004,kavita.reddy@gmail.com,Pune,Lawyer,https://linkedin.com/in/kavita-reddy,84,HOT
+L00005,Manish,Bose,9000000005,manish.bose@gmail.com,Hyderabad,Business Owner,https://linkedin.com/in/manish-bose,95,HOT
+L00006,Pooja,Das,9000000006,pooja.das@gmail.com,Chennai,IT Manager,https://linkedin.com/in/pooja-das,81,HOT
+L00007,Pradeep,Iyer,9000000007,pradeep.iyer@gmail.com,Kolkata,Banker,https://linkedin.com/in/pradeep-iyer,89,HOT
+L00008,Meera,Nair,9000000008,meera.nair@gmail.com,Ahmedabad,Professor,https://linkedin.com/in/meera-nair,76,HOT
+L00009,Rakesh,Gupta,9000000009,rakesh.gupta@gmail.com,Mumbai,CA,https://linkedin.com/in/rakesh-gupta,83,HOT
+L00010,Swati,Mukherjee,9000000010,swati.mukherjee@gmail.com,Delhi,Doctor,https://linkedin.com/in/swati-mukherjee,91,HOT
+L00011,Vivek,Banerjee,9000000011,vivek.banerjee@gmail.com,Bangalore,Engineer,https://linkedin.com/in/vivek-banerjee,79,HOT
+L00012,Anjali,Trivedi,9000000012,anjali.trivedi@gmail.com,Pune,Lawyer,https://linkedin.com/in/anjali-trivedi,86,HOT
+L00013,Gaurav,Chatterjee,9000000013,gaurav.chatterjee@gmail.com,Hyderabad,Business Owner,https://linkedin.com/in/gaurav-chatterjee,72,COLD
+L00014,Shruti,Rao,9000000014,shruti.rao@gmail.com,Chennai,IT Manager,https://linkedin.com/in/shruti-rao,68,COLD
+L00015,Naveen,Singh,9000000015,naveen.singh@gmail.com,Kolkata,Banker,https://linkedin.com/in/naveen-singh,65,COLD
+L00016,Rekha,Khan,9000000016,rekha.khan@gmail.com,Ahmedabad,Professor,https://linkedin.com/in/rekha-khan,71,COLD
+L00017,Sandeep,Pillai,9000000017,sandeep.pillai@gmail.com,Mumbai,CA,https://linkedin.com/in/sandeep-pillai,69,COLD
+L00018,Anjali,Bose,9000000018,anjali.bose@gmail.com,Delhi,Doctor,https://linkedin.com/in/anjali-bose,74,COLD
+L00019,Ramesh,Joshi,9000000019,ramesh.joshi@gmail.com,Bangalore,Engineer,https://linkedin.com/in/ramesh-joshi,67,COLD
+L00020,Anita,Mehta,9000000020,anita.mehta@gmail.com,Pune,Lawyer,https://linkedin.com/in/anita-mehta,73,COLD

@@ -1,0 +1,7 @@
+bank,account_number,ifsc,holder_name,period,total_txns,total_amount
+HDFC,XXXXXXXX4242,HDFC0ANDHERI,Arjun Mehta,01-07 Apr 2026,142,Rs. 87,32,500
+ICICI,XXXXXXXX9191,ICIC0001234,Sunita Rao,08-14 Apr 2026,128,Rs. 73,18,200
+Axis,XXXXXXXX7720,UTIB0000123,Rakesh Pillai,15-21 Apr 2026,217,Rs. 1,42,55,800
+Kotak,XXXXXXXX3344,KKBK0001234,Meera Iyer,22-28 Apr 2026 (planned),0,Rs. 0
+SBI,XXXXXXXX1008,SBIN0001234,Vikas Nair,backup,0,Rs. 0
+YesBank,XXXXXXXX5500,YESB0000123,Anita Joshi,backup,0,Rs. 0
