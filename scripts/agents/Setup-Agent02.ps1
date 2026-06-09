@@ -3,7 +3,7 @@
   Setup-Agent02.ps1  --  AGENT-02 artefact generator
   "Golden Returns Wealth Management" cyber-forensics training lab.
 
-  Role    : Priya Verma — Lead Generator
+  Role    : Priya Verma -- Lead Generator
   Username: priya.v
   Profile : C:\Users\priya.v
   IP      : 192.168.10.22
@@ -38,7 +38,7 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors       = [System.Collections.Generic.List[string]]::new()
 
-    Write-SetupLog "[$role] Invoke-RoleSetup starting — profile: $profileBase"
+    Write-SetupLog "[$role] Invoke-RoleSetup starting -- profile: $profileBase"
 
     # ==================================================================
     # 1. Desktop\leads_apr2026.csv
@@ -69,7 +69,7 @@ function Invoke-RoleSetup {
         New-DirectoryIfMissing $destDir
 
         $renewalContent = @"
-LinkedIn Sales Navigator — Renewal Reminder
+LinkedIn Sales Navigator -- Renewal Reminder
 Account: priya.verma@goldenreturns.example
 Plan: Advanced (Monthly)
 Next billing: 01-May-2026
@@ -215,7 +215,7 @@ class LinkedInScraper:
             self._logged_in = True
             return True
 
-        log.warning("Login may have failed — unexpected redirect to: %s", post_resp.url)
+        log.warning("Login may have failed -- unexpected redirect to: %s", post_resp.url)
         return False
 
     # ------------------------------------------------------------------
@@ -226,7 +226,7 @@ class LinkedInScraper:
         Applies random delays between pages to reduce rate-limit risk.
         """
         if not self._logged_in:
-            log.warning("Not logged in — search results may be limited.")
+            log.warning("Not logged in -- search results may be limited.")
 
         for page in range(1, max_pages + 1):
             params = {
@@ -263,7 +263,7 @@ class LinkedInScraper:
             )
 
             if not cards:
-                log.info("No result cards found on page %d — stopping.", page)
+                log.info("No result cards found on page %d -- stopping.", page)
                 break
 
             for card in cards:
@@ -348,7 +348,7 @@ class LinkedInScraper:
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    # Credentials — store these in environment variables in production.
+    # Credentials -- store these in environment variables in production.
     LI_USER = os.environ.get("LI_USER", "priya.verma@goldenreturns.example")
     LI_PASS = os.environ.get("LI_PASS", "")
 
@@ -518,7 +518,7 @@ if __name__ == "__main__":
         $sqlStatements.Add("INSERT INTO meta VALUES ('last_compatible_version','58');")
 
         if (-not $ChromeUrlHistory_Agent02 -or $ChromeUrlHistory_Agent02.Count -eq 0) {
-            Write-SetupLog "WARNING: `$ChromeUrlHistory_Agent02 is empty — skipping Chrome History for AGENT-02" -Level WARN
+            Write-SetupLog "WARNING: `$ChromeUrlHistory_Agent02 is empty -- skipping Chrome History for AGENT-02" -Level WARN
         } else {
             $visitId = 1
             for ($u = 0; $u -lt $ChromeUrlHistory_Agent02.Count; $u++) {
@@ -626,7 +626,7 @@ if __name__ == "__main__":
         New-DirectoryIfMissing $destDir
 
         $targetContent = @"
-Daily Target — Apr 17, 2026
+Daily Target -- Apr 17, 2026
 Leads to process: 200
 HOT leads generated today: 47
 Assigned to closers: 23
@@ -654,6 +654,6 @@ Pending assignment: 24
         Errors       = $errors.ToArray()
     }
 
-    Write-SetupLog ("[$role] Invoke-RoleSetup complete — files created: $filesCreated, errors: $($errors.Count)")
+    Write-SetupLog ("[$role] Invoke-RoleSetup complete -- files created: $filesCreated, errors: $($errors.Count)")
     return $summary
 }

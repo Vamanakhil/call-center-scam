@@ -1,5 +1,5 @@
 <#
-AGENT-03 (Amit, VoIP caller) — Targeted setup.
+AGENT-03 (Amit, VoIP caller) -- Targeted setup.
 Run on the AGENT-03 workstation. 192.168.10.33.
 #>
 [CmdletBinding()] param()

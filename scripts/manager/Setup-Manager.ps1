@@ -3,7 +3,7 @@
   Setup-Manager.ps1  --  MANAGER artefact generator
   "Golden Returns Wealth Management" cyber-forensics training lab.
 
-  Role    : Arjun Mehta — Ringleader
+  Role    : Arjun Mehta -- Ringleader
   Username: arjun.m
   Profile : $env:SystemDrive\Users\arjun.m
   IP      : 192.168.10.50
@@ -39,10 +39,10 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors       = [System.Collections.Generic.List[string]]::new()
 
-    # D: drive check — used for all D:\Manager\ artefacts.
+    # D: drive check -- used for all D:\Manager\ artefacts.
     $managerDir = if (Test-Path 'D:\') { 'D:\Manager' } else { "$env:SystemDrive\Manager" }
 
-    Write-SetupLog "[$role] Invoke-RoleSetup starting — profile: $profileBase, managerDir: $managerDir"
+    Write-SetupLog "[$role] Invoke-RoleSetup starting -- profile: $profileBase, managerDir: $managerDir"
 
     # ------------------------------------------------------------------
     # Helper: convert a UTC DateTime to Chrome/Edge timestamp
@@ -198,7 +198,7 @@ SEND TO: t.me/gr_daily_collect at 23:00
     }
 
     # ==================================================================
-    # 5. AnyDesk session log  (14 days, Apr 4–17 2026)
+    # 5. AnyDesk session log  (14 days, Apr 4-17 2026)
     # ==================================================================
     Write-SetupLog "[$role] Step 5: AnyDesk ad_sessions.log"
     try {
@@ -206,7 +206,7 @@ SEND TO: t.me/gr_daily_collect at 23:00
         New-DirectoryIfMissing $anyDeskDir
 
         # Session parameters: connect to ID 823411902 at 103.41.218.91.
-        # Generate 1–3 sessions per day for Apr 4..Apr 17 deterministically.
+        # Generate 1-3 sessions per day for Apr 4..Apr 17 deterministically.
         # Use a local seeded RNG (independent of the global GR_Rng) so the
         # log content is stable across reruns.
         $adRng = New-Object System.Random(2026)
@@ -228,7 +228,7 @@ SEND TO: t.me/gr_daily_collect at 23:00
             # any random earlier sessions for that day.
             $isLastDay = ($d -eq ($endDate - $startDate).Days)
 
-            # 1–3 sessions per day; last day always gets at least 1 (the forced one).
+            # 1-3 sessions per day; last day always gets at least 1 (the forced one).
             $numSessions = $adRng.Next(1, 4)
 
             # Generate random sessions for this day (skip if they'd collide with 23:xx).
@@ -242,7 +242,7 @@ SEND TO: t.me/gr_daily_collect at 23:00
                     $duration   = '32m 47s'
 
                     $sessionLines.Add('[{0}] [client] Connecting to 823411902 (103.41.218.91)' -f $connTime.ToString('yyyy-MM-dd HH:mm:ss'))
-                    $sessionLines.Add('[{0}] [client] Connected to 823411902 (103.41.218.91) — session started' -f $connedTime.ToString('yyyy-MM-dd HH:mm:ss'))
+                    $sessionLines.Add('[{0}] [client] Connected to 823411902 (103.41.218.91) -- session started' -f $connedTime.ToString('yyyy-MM-dd HH:mm:ss'))
                     $sessionLines.Add('[{0}] [client] Session ended (duration: {1})' -f $endTime.ToString('yyyy-MM-dd HH:mm:ss'), $duration)
 
                     $sessionLines.Add('[2026-04-17 23:47:33] [client] Connecting to 823411902 (103.41.218.91)')
@@ -264,17 +264,17 @@ SEND TO: t.me/gr_daily_collect at 23:00
                 $ss      = $adRng.Next(0, 60)
 
                 $connTime   = $day.Date.AddHours($hh).AddMinutes($mm).AddSeconds($ss)
-                # Connection establishment: 3–6 seconds.
+                # Connection establishment: 3-6 seconds.
                 $connedTime = $connTime.AddSeconds($adRng.Next(3, 7))
 
-                # Session duration: 8–45 minutes.
+                # Session duration: 8-45 minutes.
                 $durationMin = $adRng.Next(8, 46)
                 $durationSec = $adRng.Next(0, 60)
                 $endTime     = $connedTime.AddMinutes($durationMin).AddSeconds($durationSec)
                 $durationStr = '{0}m {1:00}s' -f $durationMin, $durationSec
 
                 $sessionLines.Add('[{0}] [client] Connecting to 823411902 (103.41.218.91)' -f $connTime.ToString('yyyy-MM-dd HH:mm:ss'))
-                $sessionLines.Add('[{0}] [client] Connected to 823411902 (103.41.218.91) — session started' -f $connedTime.ToString('yyyy-MM-dd HH:mm:ss'))
+                $sessionLines.Add('[{0}] [client] Connected to 823411902 (103.41.218.91) -- session started' -f $connedTime.ToString('yyyy-MM-dd HH:mm:ss'))
                 $sessionLines.Add('[{0}] [client] Session ended (duration: {1})' -f $endTime.ToString('yyyy-MM-dd HH:mm:ss'), $durationStr)
             }
         }
@@ -336,7 +336,7 @@ SEND TO: t.me/gr_daily_collect at 23:00
     # ==================================================================
     # 7. Recycle Bin: complaints_to_ignore.xlsx
     # ==================================================================
-    Write-SetupLog "[$role] Step 7: Recycle Bin — complaints_to_ignore.xlsx"
+    Write-SetupLog "[$role] Step 7: Recycle Bin -- complaints_to_ignore.xlsx"
     try {
         # Temp location to build the docx before moving it.
         $tmpDir = "$profileBase\AppData\Local\Temp"
@@ -385,7 +385,7 @@ STATUS: 3 active complaints known. Legal says ignore unless formal notice served
         $filesCreated++
         Write-SetupLog "[$role] Created recycled file: $recycledXlsx"
 
-        # Build the Windows 10 $I (Recycle Bin info) binary — 548 bytes.
+        # Build the Windows 10 $I (Recycle Bin info) binary -- 548 bytes.
         # Layout: magic(8) | fileSize(8) | deletionTime(8) | charCount(4) | path(520)
         $originalPath = "$profileBase\Documents\complaints_to_ignore.xlsx"
         $pathUtf16    = [System.Text.Encoding]::Unicode.GetBytes($originalPath + "`0")
@@ -465,7 +465,7 @@ Write-Host "Report ready: $reportFile"
         $output = & schtasks.exe @schtasksArgs 2>&1
         $exit   = $LASTEXITCODE
         if ($exit -ne 0) {
-            $msg = "[$role] Step 8b: schtasks DailyCollectionReport returned exit $exit — $output"
+            $msg = "[$role] Step 8b: schtasks DailyCollectionReport returned exit $exit -- $output"
             Write-SetupLog $msg 'WARN'
             $errors.Add($msg)
         } else {
@@ -491,7 +491,7 @@ Write-Host "Report ready: $reportFile"
         $output = & schtasks.exe @dnsFlushArgs 2>&1
         $exit   = $LASTEXITCODE
         if ($exit -ne 0) {
-            $msg = "[$role] Step 8c: schtasks DNSFlush returned exit $exit — $output"
+            $msg = "[$role] Step 8c: schtasks DNSFlush returned exit $exit -- $output"
             Write-SetupLog $msg 'WARN'
             $errors.Add($msg)
         } else {
@@ -515,7 +515,7 @@ Write-Host "Report ready: $reportFile"
         New-DirectoryIfMissing $oneDriveBackup
 
         $syncStatusPath    = "$oneDriveBackup\Sync_Status.txt"
-        $syncStatusContent = "OneDrive sync active for $managerDir\ — last sync: 2026-04-17 22:41:09 | Files: 47 | Size: 23.4 MB"
+        $syncStatusContent = "OneDrive sync active for $managerDir\ -- last sync: 2026-04-17 22:41:09 | Files: 47 | Size: 23.4 MB"
         [System.IO.File]::WriteAllText($syncStatusPath, $syncStatusContent, [System.Text.Encoding]::UTF8)
         Add-HashRecord -FilePath $syncStatusPath -Role $role
         $filesCreated++
@@ -563,7 +563,7 @@ Write-Host "Report ready: $reportFile"
                 Set-ItemProperty -LiteralPath $fullKey -Name 'FriendlyName' -Value $dev.FriendlyName -Force
                 Set-ItemProperty -LiteralPath $fullKey -Name 'DeviceDesc'   -Value $dev.DeviceDesc   -Force
                 $filesCreated++
-                Write-SetupLog "[$role] Created USBSTOR key: $($dev.Key) — $($dev.FriendlyName)"
+                Write-SetupLog "[$role] Created USBSTOR key: $($dev.Key) -- $($dev.FriendlyName)"
             } catch {
                 $msg = "[$role] Step 10: Failed to create USBSTOR key '$($dev.Key)': $($_.Exception.Message)"
                 Write-SetupLog $msg 'WARN'
@@ -629,13 +629,13 @@ Write-Host "Report ready: $reportFile"
                 [System.BitConverter]::GetBytes([uint32]0).CopyTo($lnkBytes, 56)
                 # ShowCommand: SW_SHOWNORMAL = 1
                 [System.BitConverter]::GetBytes([uint32]0x01).CopyTo($lnkBytes, 60)
-                # HotKey, Reserved1, Reserved2, Reserved3 — all zero (already zero-initialised)
+                # HotKey, Reserved1, Reserved2, Reserved3 -- all zero (already zero-initialised)
 
                 $lnkPath = "$recentDir\$($lnk.Name)"
                 [System.IO.File]::WriteAllBytes($lnkPath, $lnkBytes)
                 Add-HashRecord -FilePath $lnkPath -Role $role
                 $filesCreated++
-                Write-SetupLog "[$role] Created LNK: $lnkPath (→ $($lnk.Target))"
+                Write-SetupLog "[$role] Created LNK: $lnkPath (-> $($lnk.Target))"
             } catch {
                 $msg = "[$role] Step 11: Failed to create LNK '$($lnk.Name)': $($_.Exception.Message)"
                 Write-SetupLog $msg 'WARN'
@@ -703,6 +703,6 @@ Write-Host "Report ready: $reportFile"
         'BLOCKED'
     }
 
-    Write-SetupLog ("[$role] Invoke-RoleSetup complete — files created: $filesCreated, errors: $($errors.Count) — status: $status")
+    Write-SetupLog ("[$role] Invoke-RoleSetup complete -- files created: $filesCreated, errors: $($errors.Count) -- status: $status")
     return $summary
 }

@@ -3,7 +3,7 @@
   Setup-Agent05.ps1  --  AGENT-05 artefact generator
   "Golden Returns Wealth Management" cyber-forensics training lab.
 
-  Role    : Vikas Nair — IT Support
+  Role    : Vikas Nair -- IT Support
   Username: vikas.n
   Profile : C:\Users\vikas.n
   IP      : 192.168.10.55
@@ -24,7 +24,7 @@
   drive letter if one is present at runtime. No network traffic,
   no real credential exfiltration, no persistence is actually installed
   by running this setup script. The registry Run key and scheduled task
-  are written as forensic artefacts only — the stub.ps1 they point to
+  are written as forensic artefacts only -- the stub.ps1 they point to
   is a static file, not an active threat. Safe for isolated lab use.
 ================================================================================
 #>
@@ -48,7 +48,7 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors       = [System.Collections.Generic.List[string]]::new()
 
-    Write-SetupLog "[$role] Invoke-RoleSetup starting — profile: $profileBase"
+    Write-SetupLog "[$role] Invoke-RoleSetup starting -- profile: $profileBase"
 
     # ------------------------------------------------------------------
     # Shared stub content (used by steps 1, 2, and 3)
@@ -115,7 +115,7 @@ while ($true) {
 '@
 
     # ==================================================================
-    # 1. Documents\stub.ps1 — malware stub PowerShell source
+    # 1. Documents\stub.ps1 -- malware stub PowerShell source
     # ==================================================================
     Write-SetupLog "[$role] Step 1: Documents\stub.ps1"
     try {
@@ -134,10 +134,10 @@ while ($true) {
     }
 
     # ==================================================================
-    # 2. ProgramData\Updater\updater.exe — compiled stub (benign EXE placeholder)
+    # 2. ProgramData\Updater\updater.exe -- compiled stub (benign EXE placeholder)
     #    Starts with a real MZ DOS header so hex editors identify it as PE,
     #    followed by the DOS mode string and then the stub.ps1 content.
-    #    BENIGN — no real PE code, purely a forensic training artefact.
+    #    BENIGN -- no real PE code, purely a forensic training artefact.
     # ==================================================================
     Write-SetupLog "[$role] Step 2: ProgramData\Updater\updater.exe"
     try {
@@ -190,7 +190,7 @@ while ($true) {
     }
 
     # ==================================================================
-    # 3. ProgramData\Updater\stub.ps1 — copy of stub at ProgramData location
+    # 3. ProgramData\Updater\stub.ps1 -- copy of stub at ProgramData location
     #    (this is what the Run key and scheduled task actually reference)
     # ==================================================================
     Write-SetupLog "[$role] Step 3: ProgramData\Updater\stub.ps1"
@@ -210,7 +210,7 @@ while ($true) {
     }
 
     # ==================================================================
-    # 4. Registry Run key — persistence artefact
+    # 4. Registry Run key -- persistence artefact
     #    HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
     #    Value: Updater = powershell.exe -WindowStyle Hidden ... stub.ps1
     # ==================================================================
@@ -229,7 +229,7 @@ while ($true) {
     }
 
     # ==================================================================
-    # 5. Documents\Updater_Task.xml — scheduled task XML + task registration
+    # 5. Documents\Updater_Task.xml -- scheduled task XML + task registration
     # ==================================================================
     Write-SetupLog "[$role] Step 5: Updater_Task.xml + schtasks registration"
     try {
@@ -243,7 +243,7 @@ while ($true) {
   <RegistrationInfo>
     <Date>2026-02-14T10:00:00</Date>
     <Author>AGENT-05\vikas.n</Author>
-    <Description>System updater service — do not remove</Description>
+    <Description>System updater service -- do not remove</Description>
   </RegistrationInfo>
   <Triggers>
     <CalendarTrigger>
@@ -291,7 +291,7 @@ while ($true) {
                 Write-SetupLog "[$role] Registered scheduled task: \Updater\DailyTrigger"
             } else {
                 Write-SetupLog "[$role] schtasks.exe exited with code $LASTEXITCODE (may need elevated privileges or task XML encoding)" 'WARN'
-                $errors.Add("[$role] Step 5: schtasks returned exit code $LASTEXITCODE — task XML written but task may not be registered")
+                $errors.Add("[$role] Step 5: schtasks returned exit code $LASTEXITCODE -- task XML written but task may not be registered")
             }
         } catch {
             Write-SetupLog "[$role] schtasks.exe invocation failed: $($_.Exception.Message)" 'WARN'
@@ -304,7 +304,7 @@ while ($true) {
     }
 
     # ==================================================================
-    # 6. Documents\pi_ping.py — Raspberry Pi keepalive script
+    # 6. Documents\pi_ping.py -- Raspberry Pi keepalive script
     # ==================================================================
     Write-SetupLog "[$role] Step 6: Documents\pi_ping.py"
     try {
@@ -380,12 +380,12 @@ if __name__ == "__main__":
     }
 
     # ==================================================================
-    # 7. Hidden USB folder — GR_LabAssets\HiddenUSB\
+    # 7. Hidden USB folder -- GR_LabAssets\HiddenUSB\
     #    Contains: victims_old.xlsx, passwords.txt, .lnk_to_crm_admin.lnk
     # ==================================================================
     Write-SetupLog "[$role] Step 7: HiddenUSB folder artefacts"
 
-    # 7a. victims_old.xlsx (DOCX container with .xlsx extension — placeholder)
+    # 7a. victims_old.xlsx (DOCX container with .xlsx extension -- placeholder)
     Write-SetupLog "[$role] Step 7a: HiddenUSB\victims_old.xlsx"
     try {
         $usbDir = "$env:SystemDrive\GR_LabAssets\HiddenUSB"
@@ -393,7 +393,7 @@ if __name__ == "__main__":
 
         # Build old victim list text (50 victims from VictimData).
         $sb = [System.Text.StringBuilder]::new()
-        [void]$sb.AppendLine('Old Victim List — Golden Returns (Pre-CRM, manually maintained)')
+        [void]$sb.AppendLine('Old Victim List -- Golden Returns (Pre-CRM, manually maintained)')
         [void]$sb.AppendLine('Exported: 2026-03-01')
         [void]$sb.AppendLine('=' * 70)
         [void]$sb.AppendLine('')
@@ -424,7 +424,7 @@ if __name__ == "__main__":
         $errors.Add($msg)
     }
 
-    # 7b. passwords.txt — auto-planted credential backup file
+    # 7b. passwords.txt -- auto-planted credential backup file
     Write-SetupLog "[$role] Step 7b: HiddenUSB\passwords.txt"
     try {
         $usbDir = "$env:SystemDrive\GR_LabAssets\HiddenUSB"
@@ -442,13 +442,13 @@ if __name__ == "__main__":
         $errors.Add($msg)
     }
 
-    # 7c. .lnk_to_crm_admin.lnk — suspicious LNK stub (76 bytes)
+    # 7c. .lnk_to_crm_admin.lnk -- suspicious LNK stub (76 bytes)
     Write-SetupLog "[$role] Step 7c: HiddenUSB\.lnk_to_crm_admin.lnk"
     try {
         $usbDir = "$env:SystemDrive\GR_LabAssets\HiddenUSB"
         New-DirectoryIfMissing $usbDir
 
-        # Minimal Windows Shell Link (.lnk) file — 76-byte header only.
+        # Minimal Windows Shell Link (.lnk) file -- 76-byte header only.
         # Magic: 4C 00 00 00 (LNK signature)
         # CLSID: 01 14 02 00 00 00 00 00 C0 00 00 00 00 00 00 46
         # LinkFlags: 00 00 00 00 (no target/extra blocks)
@@ -511,13 +511,13 @@ if __name__ == "__main__":
 
         $agent05Urls = @(
             @{ Url='https://goldenreturns.example/admin';                              Title='GR Admin Panel';                          VisitCount=234; LastVisit='2026-04-17 19:50:00' },
-            @{ Url='https://goldenreturns.example/admin/users';                       Title='GR Admin — Users';                        VisitCount=89;  LastVisit='2026-04-17 18:30:00' },
+            @{ Url='https://goldenreturns.example/admin/users';                       Title='GR Admin -- Users';                        VisitCount=89;  LastVisit='2026-04-17 18:30:00' },
             @{ Url='https://192.168.10.100/phpmyadmin';                               Title='phpMyAdmin';                              VisitCount=67;  LastVisit='2026-04-17 17:00:00' },
             @{ Url='https://192.168.10.100/golden_crm';                               Title='Golden CRM';                              VisitCount=145; LastVisit='2026-04-17 19:00:00' },
-            @{ Url='https://t.me/gr_daily_collect';                                   Title='Telegram — GR Daily';                     VisitCount=12;  LastVisit='2026-04-17 16:00:00' },
+            @{ Url='https://t.me/gr_daily_collect';                                   Title='Telegram -- GR Daily';                     VisitCount=12;  LastVisit='2026-04-17 16:00:00' },
             @{ Url='https://www.virustotal.com';                                       Title='VirusTotal';                              VisitCount=3;   LastVisit='2026-04-15 11:00:00' },
             @{ Url='https://anydesk.com/en/downloads/windows';                        Title='AnyDesk Download';                        VisitCount=2;   LastVisit='2026-04-10 09:00:00' },
-            @{ Url='https://stackoverflow.com/questions/powershell-usb-detection';    Title='StackOverflow — USB detection';           VisitCount=8;   LastVisit='2026-04-12 14:00:00' },
+            @{ Url='https://stackoverflow.com/questions/powershell-usb-detection';    Title='StackOverflow -- USB detection';           VisitCount=8;   LastVisit='2026-04-12 14:00:00' },
             @{ Url='https://docs.microsoft.com/en-us/powershell';                     Title='PowerShell Docs';                         VisitCount=15;  LastVisit='2026-04-13 10:00:00' }
         )
 
@@ -597,6 +597,6 @@ authentication level:i:2
         Errors       = $errors.ToArray()
     }
 
-    Write-SetupLog ("[$role] Invoke-RoleSetup complete — files created: $filesCreated, errors: $($errors.Count)")
+    Write-SetupLog ("[$role] Invoke-RoleSetup complete -- files created: $filesCreated, errors: $($errors.Count)")
     return $summary
 }

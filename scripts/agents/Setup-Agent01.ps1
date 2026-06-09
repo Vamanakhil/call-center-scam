@@ -3,7 +3,7 @@
   Setup-Agent01.ps1  --  AGENT-01 artefact generator
   "Golden Returns Wealth Management" cyber-forensics training lab.
 
-  Role    : Rahul Sharma — Senior Closer
+  Role    : Rahul Sharma -- Senior Closer
   Username: rahul.s
   Profile : C:\Users\rahul.s
   IP      : 192.168.10.11
@@ -38,7 +38,7 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors      = [System.Collections.Generic.List[string]]::new()
 
-    Write-SetupLog "[$role] Invoke-RoleSetup starting — profile: $profileBase"
+    Write-SetupLog "[$role] Invoke-RoleSetup starting -- profile: $profileBase"
 
     # ------------------------------------------------------------------
     # Helper: wrap each file-creation block.
@@ -54,14 +54,14 @@ function Invoke-RoleSetup {
         New-DirectoryIfMissing $destDir
 
         $closerBody = @'
-CLOSER SCRIPT — Golden Returns Wealth Management
+CLOSER SCRIPT -- Golden Returns Wealth Management
 FOR INTERNAL USE ONLY. DO NOT SHARE WITH CUSTOMER OR SHOW ON SCREEN.
-Document Version: 4.2 — Approved by Arjun, Apr 2026.
+Document Version: 4.2 -- Approved by Arjun, Apr 2026.
 ==============================================================
 
-SECTION 1 — GREETING
+SECTION 1 -- GREETING
 ---------------------
-"Good [morning/afternoon], may I speak with [Name] ji? … Sir/Madam, I am Rahul
+"Good [morning/afternoon], may I speak with [Name] ji? ... Sir/Madam, I am Rahul
 calling from Golden Returns Wealth Management. You had shown interest in our
 assured wealth growth programme some time ago. Do you have two minutes?"
 
@@ -69,40 +69,40 @@ If they say no: "I completely understand, sir. Would tomorrow morning at 10 be
 convenient? I will call you at exactly that time."
 
 
-SECTION 2 — BUILDING RAPPORT
+SECTION 2 -- BUILDING RAPPORT
 -----------------------------
 "Sir, I see from your profile that you are from [City] and you are in [profession].
-Most of our best-performing clients are from the same background — people who
+Most of our best-performing clients are from the same background -- people who
 understand money and don't want it just sitting in an FD earning 6% when inflation
 is at 7%. Am I right?"
 
 Pause. Let them agree. Mirror their language. Speak slowly, with confidence.
 Key phrases: "as a fellow investor," "between us," "confidentially," "this is not
-for everyone — we screen our clients."
+for everyone -- we screen our clients."
 
 
-SECTION 3 — PRESENTING THE OPPORTUNITY
+SECTION 3 -- PRESENTING THE OPPORTUNITY
 ---------------------------------------
 "Golden Returns is a SEBI-registered portfolio advisory firm operating under a
-Category III AIF licence. Our flagship product — the Gold Assurance Plan — has
-delivered 18–22% per annum net returns consistently for the last 36 months. Our
+Category III AIF licence. Our flagship product -- the Gold Assurance Plan -- has
+delivered 18-22% per annum net returns consistently for the last 36 months. Our
 minimum ticket size is Rs 25,000. Most clients start small and increase. I have
 clients who started with Rs 25,000 in January and are now at Rs 3 lakh. Their
 names are on our website."
 
 Show: goldenreturns.example/testimonials (Arjun to keep page live.)
-Do NOT mention specific names unless the victim asks — then use VICTIM-008 alias.
+Do NOT mention specific names unless the victim asks -- then use VICTIM-008 alias.
 
 
-SECTION 4 — HANDLING SEBI OBJECTION
+SECTION 4 -- HANDLING SEBI OBJECTION
 -------------------------------------
 When the victim says "I will call SEBI":
-"Sir, you absolutely can and you should — that shows you are a careful investor and
+"Sir, you absolutely can and you should -- that shows you are a careful investor and
 I respect that. SEBI is a regulatory body. They take 6 to 8 months to even
 acknowledge a standard enquiry. By the time they even reply, your returns in our
-scheme would have grown 20%. But more importantly — we ARE registered with SEBI.
+scheme would have grown 20%. But more importantly -- we ARE registered with SEBI.
 Our CIN is U67120MH2020PTC123456. You can verify it on the MCA21 portal right now.
-Shall I wait while you check? … You see, sir — everything is transparent. Now, the
+Shall I wait while you check? ... You see, sir -- everything is transparent. Now, the
 real question is: do you want your money working for you while you wait, or do you
 want it sitting idle?"
 
@@ -110,75 +110,75 @@ Do NOT panic. Do NOT end the call. Stay warm and confident.
 Key phrase: "This is a relationship, not a transaction."
 
 
-SECTION 5 — HANDLING "TOO GOOD TO BE TRUE"
+SECTION 5 -- HANDLING "TOO GOOD TO BE TRUE"
 --------------------------------------------
 "Sir, I completely understand that reaction. Two years ago I would have said the
 same thing. The truth is: 18% is not magic. It is achievable when you have insider
 access to pre-IPO allotments and arbitrage in the SGX-NSE price differential. Our
-fund manager Ravi Menon has 22 years of experience. Our top clients — and I am not
-allowed to name them — include retired senior IAS officers and a former PSU bank MD.
-Would someone of that stature invest if this was fake? … Exactly."
+fund manager Ravi Menon has 22 years of experience. Our top clients -- and I am not
+allowed to name them -- include retired senior IAS officers and a former PSU bank MD.
+Would someone of that stature invest if this was fake? ... Exactly."
 
 Use the "social proof" technique. Refer to anonymous high-status clients.
 If they press: "Sir, SEBI registration alone protects you. We are not going anywhere."
 
 
-SECTION 6 — HANDLING HESITATION / "LET ME THINK"
+SECTION 6 -- HANDLING HESITATION / "LET ME THINK"
 --------------------------------------------------
 "Sir, absolutely take your time. The only thing I will say is that the next
 subscription window closes on the 25th of this month. After that the plan is
 locked for new entrants for 90 days. I have two slots left for this cycle. I have
 already kept one for you because of your profile. If you do not take it, I will
-have to release it. It is not pressure — it is just the reality of a capped scheme."
+have to release it. It is not pressure -- it is just the reality of a capped scheme."
 
 Scarcity + deadline + personalisation. Works 60% of the time on second objection.
 
 
-SECTION 7 — CLOSING TECHNIQUE
+SECTION 7 -- CLOSING TECHNIQUE
 -------------------------------
 "So shall I send you the payment QR code now? Rs 25,000 is the starting amount.
 You will receive a welcome email from our CRM within 2 hours. Your dashboard will
 show your balance growing daily. Most clients re-invest their first month's returns
-immediately — you don't even have to do anything. Shall I send it to this WhatsApp
+immediately -- you don't even have to do anything. Shall I send it to this WhatsApp
 number only, or do you have a different one?"
 
 Assume-the-close: frame it as a logistics question, not a yes/no question.
 If they say "send it": immediately send the UPI QR from WhatsApp Web (see Section 8).
 
 
-SECTION 8 — PAYMENT INSTRUCTIONS
+SECTION 8 -- PAYMENT INSTRUCTIONS
 -----------------------------------
-Current active UPI: compliance.gr@upi (Axis Bank — XXXXXX7720)
-Alternate: gr.deposit@upi (ICICI — XXXXXX9191)
-Fallback: arjun.collect@upi (HDFC — XXXXXX4242)
+Current active UPI: compliance.gr@upi (Axis Bank -- XXXXXX7720)
+Alternate: gr.deposit@upi (ICICI -- XXXXXX9191)
+Fallback: arjun.collect@upi (HDFC -- XXXXXX4242)
 
 Always confirm receipt with: "Sir, I can see the payment. Your plan is now active.
-You will receive a PDF confirmation in 24 hours. Your relationship manager is me —
+You will receive a PDF confirmation in 24 hours. Your relationship manager is me --
 save this number. Call me for ANY concern."
 
 Do NOT use the mule account names on any customer-facing communication.
 If victim asks for a receipt: share the GoldenReturns.example PDF template (Vikas
-will generate it from the CRM — raise a ticket in the Telegram group).
+will generate it from the CRM -- raise a ticket in the Telegram group).
 
 
-SECTION 9 — HANDLING WITHDRAWAL REQUESTS
+SECTION 9 -- HANDLING WITHDRAWAL REQUESTS
 ------------------------------------------
 "Sir, I completely understand. Your money is absolutely safe. The withdrawal process
-takes 7–10 working days as per our fund structure. Can I ask — is there an
+takes 7-10 working days as per our fund structure. Can I ask -- is there an
 emergency? Because if you need the money urgently I can raise a priority request,
-but there is a 2% early exit fee. … Sir, honestly — withdrawing now would mean
+but there is a 2% early exit fee. ... Sir, honestly -- withdrawing now would mean
 missing the Q1 bonus payout which is due in 8 days. Let me send you the bonus
 schedule. Take one week more and you will get an extra 5% on your corpus. Is that
 fair?"
 
-Delay-and-distract. Buy 2–3 more weeks. Escalate to Arjun if victim is very firm.
+Delay-and-distract. Buy 2-3 more weeks. Escalate to Arjun if victim is very firm.
 
 
-SECTION 10 — HANDLING POLICE / CYBER CELL THREATS
+SECTION 10 -- HANDLING POLICE / CYBER CELL THREATS
 ---------------------------------------------------
 "Sir, I respect your concern completely. If you have any doubt, you should verify.
-Our registered address is Suite 12, Prestige Tower, BKC, Mumbai — you can visit us.
-Our directors are on the MCA portal. But sir, may I request — before you do
+Our registered address is Suite 12, Prestige Tower, BKC, Mumbai -- you can visit us.
+Our directors are on the MCA portal. But sir, may I request -- before you do
 anything, speak to me once more? I have seen cases where a misunderstanding like
 this caused a client to lose their bonus payout permanently. Can we have a 15-minute
 call tomorrow? I will bring our compliance officer on the line."
@@ -187,11 +187,11 @@ If they threaten the police: remain calm. Do NOT threaten back. Stall.
 Notify Arjun on Telegram (@gr_daily_collect) with victim ID and threat level.
 
 
-SECTION 11 — FOLLOW-UP PROMISE
+SECTION 11 -- FOLLOW-UP PROMISE
 --------------------------------
 "Sir, I will call you personally every Friday with your portfolio update. You will
 also receive an auto-SMS from our system every Monday. My personal number is saved
-in your phone — use it any time. We are not a bank or a call centre. We are your
+in your phone -- use it any time. We are not a bank or a call centre. We are your
 personal wealth team."
 
 After each call: update the victim record in the CRM within 30 minutes.
@@ -199,7 +199,7 @@ WhatsApp follow-up within 2 hours of every call.
 If no response in 48 hours: escalate to Priya (lead generator) for re-contact.
 
 
-SECTION 12 — NOTES FOR NEW CLOSERS
+SECTION 12 -- NOTES FOR NEW CLOSERS
 -------------------------------------
 - Never use the words "guaranteed returns" in writing. Say "consistent historical
   performance" or "expected annualised growth."
@@ -207,9 +207,9 @@ SECTION 12 — NOTES FOR NEW CLOSERS
 - If a victim records the call: deny, say it was a "hypothetical illustration."
 - SEBI complaint reference number (if victim cites one): reply "We are aware, it is
   being handled by our legal team. Please don't take any further action until they
-  contact you — it will jeopardise the process."
+  contact you -- it will jeopardise the process."
 - Target: 5 new deposits per day minimum. Arjun monitors daily at 8 PM.
-- WhatsApp group for closers: "GR Closers Elite" — ask Arjun for the invite link.
+- WhatsApp group for closers: "GR Closers Elite" -- ask Arjun for the invite link.
 - The "golden returns" brand name is NOT trademarked. Do NOT put it in writing
   on official-looking letterhead without Vikas checking it first.
 
@@ -238,7 +238,7 @@ NOTE: This version is approved and current. Replace any older copies.
         $hotVictimNums = @(1,23,47,52,88,101,122,145,167,189,202,234)
 
         $sb = [System.Text.StringBuilder]::new()
-        [void]$sb.AppendLine('Hot Leads — Today''s Priority List — 17-Apr-2026')
+        [void]$sb.AppendLine('Hot Leads -- Today''s Priority List -- 17-Apr-2026')
         [void]$sb.AppendLine('=' * 60)
         [void]$sb.AppendLine('')
         [void]$sb.AppendLine('Prepared by: Arjun (Manager)  |  Closer: Rahul Sharma')
@@ -286,12 +286,12 @@ NOTE: This version is approved and current. Replace any older copies.
         New-DirectoryIfMissing $destDir
 
         $targetContent = @"
-Daily Target — Apr 17, 2026
+Daily Target -- Apr 17, 2026
 Target: Rs 5,00,000
 Current: Rs 1,42,000
 Remaining: Rs 3,58,000
 
-— Arjun
+-- Arjun
 "@
 
         $targetPath = "$destDir\Daily_Target.txt"
@@ -323,41 +323,41 @@ Remaining: Rs 3,58,000
         $n202 = if ($v202) { $v202.Name } else { 'Unknown Victim' }
 
         $callNotesContent = @"
-# Call Notes — 17 Apr 2026
+# Call Notes -- 17 Apr 2026
 **Agent:** Rahul Sharma (rahul.s)
 **Date:** 2026-04-17
 
 ---
 
-## Call with $n001 (VICTIM-001) — 09:22
-- First contact. Picked up after 2 rings — good sign.
-- Intro went well. He is a retired LIC agent from Pune — knows financial products.
+## Call with $n001 (VICTIM-001) -- 09:22
+- First contact. Picked up after 2 rings -- good sign.
+- Intro went well. He is a retired LIC agent from Pune -- knows financial products.
 - Pitched Gold Assurance Plan at 20% p.a. He was cautious at first.
-- Asked for SEBI registration proof — sent him the CIN on WhatsApp.
+- Asked for SEBI registration proof -- sent him the CIN on WhatsApp.
 - Agreed in principle to invest Rs 25,000 as a trial. Will confirm tomorrow morning.
 - **Follow-up:** Call at 10:00 on 18-Apr. Send him the payment QR tonight on WA.
-- **Status:** WARM → CONVERTING
+- **Status:** WARM -> CONVERTING
 
 ---
 
-## Call with $n047 (VICTIM-047) — 11:05
+## Call with $n047 (VICTIM-047) -- 11:05
 - 3rd follow-up call. He had promised Rs 50,000 last week.
 - He said his wife is suspicious and wants a "certificate" from SEBI.
 - Used Section 4 script (SEBI objection). Told him SEBI takes 6-8 months to reply.
 - He calmed down. Agreed to invest 50k by end of day today.
-- Confirmed payment came in at 14:32 — Rs 50,000 to compliance.gr@upi.
+- Confirmed payment came in at 14:32 -- Rs 50,000 to compliance.gr@upi.
 - Sent him a WhatsApp receipt (Vikas generated from CRM).
-- **Status:** CONVERTED — Rs 50,000 received. Update victim record.
+- **Status:** CONVERTED -- Rs 50,000 received. Update victim record.
 
 ---
 
-## Call with $n202 (VICTIM-202) — 16:47
+## Call with $n202 (VICTIM-202) -- 16:47
 - He is angry. Says he has filed a complaint with the Cyber Cell.
 - I used the stalling script (Section 10). Told him our legal team will contact him.
-- He mentioned a complaint reference number — CYCCELL/MUM/2026/04172.
+- He mentioned a complaint reference number -- CYCCELL/MUM/2026/04172.
 - Arjun notified on Telegram immediately (threat level: HIGH).
 - He hung up. Do NOT call him again without Arjun's approval.
-- **Status:** HIGH RISK — Arjun to manage from here.
+- **Status:** HIGH RISK -- Arjun to manage from here.
 
 ---
 
@@ -398,19 +398,19 @@ Remaining: Rs 3,58,000
         $pdfBuilder.AppendLine('%PDF-1.4') | Out-Null
         $pdfBuilder.AppendLine('%' + [char]0xE2 + [char]0xE3 + [char]0xCF + [char]0xD3) | Out-Null
 
-        # Obj 1 — Catalog
+        # Obj 1 -- Catalog
         $off1 = [System.Text.Encoding]::ASCII.GetByteCount($pdfBuilder.ToString())
         $pdfBuilder.AppendLine('1 0 obj') | Out-Null
         $pdfBuilder.AppendLine('<< /Type /Catalog /Pages 2 0 R >>') | Out-Null
         $pdfBuilder.AppendLine('endobj') | Out-Null
 
-        # Obj 2 — Pages
+        # Obj 2 -- Pages
         $off2 = [System.Text.Encoding]::ASCII.GetByteCount($pdfBuilder.ToString())
         $pdfBuilder.AppendLine('2 0 obj') | Out-Null
         $pdfBuilder.AppendLine('<< /Type /Pages /Kids [3 0 R] /Count 1 >>') | Out-Null
         $pdfBuilder.AppendLine('endobj') | Out-Null
 
-        # Obj 3 — Page
+        # Obj 3 -- Page
         $off3 = [System.Text.Encoding]::ASCII.GetByteCount($pdfBuilder.ToString())
         $pdfBuilder.AppendLine('3 0 obj') | Out-Null
         $pdfBuilder.AppendLine('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]') | Out-Null
@@ -418,7 +418,7 @@ Remaining: Rs 3,58,000
         $pdfBuilder.AppendLine('   /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>') | Out-Null
         $pdfBuilder.AppendLine('endobj') | Out-Null
 
-        # Obj 4 — Content stream
+        # Obj 4 -- Content stream
         $off4 = [System.Text.Encoding]::ASCII.GetByteCount($pdfBuilder.ToString())
         $pdfBuilder.AppendLine('4 0 obj') | Out-Null
         $pdfBuilder.AppendLine("<< /Length $streamLen >>") | Out-Null
@@ -515,7 +515,7 @@ Remaining: Rs 3,58,000
     <div class="bubble">
       <div class="sender-name">$vName</div>
       Hello, you called me earlier about some investment scheme?
-      <div class="meta">14:10 ✓</div>
+      <div class="meta">14:10 [v]</div>
     </div>
   </div>
 
@@ -523,10 +523,10 @@ Remaining: Rs 3,58,000
     <div class="bubble">
       <div class="sender-name">Rahul (GR Support)</div>
       Yes sir! Thank you for reaching back. I am Rahul from Golden Returns
-      Wealth Management. We have an exciting opportunity — our Gold Assurance
+      Wealth Management. We have an exciting opportunity -- our Gold Assurance
       Plan is giving consistent 18-22% per annum returns. Minimum investment
       is just Rs 25,000. Can I share more details?
-      <div class="meta">14:12 ✓✓</div>
+      <div class="meta">14:12 [v][v]</div>
     </div>
   </div>
 
@@ -534,7 +534,7 @@ Remaining: Rs 3,58,000
     <div class="bubble">
       <div class="sender-name">$vName</div>
       Sounds interesting. Is it SEBI registered?
-      <div class="meta">14:15 ✓</div>
+      <div class="meta">14:15 [v]</div>
     </div>
   </div>
 
@@ -544,15 +544,15 @@ Remaining: Rs 3,58,000
       Absolutely sir! We are fully SEBI registered under Category III AIF.
       CIN: U67120MH2020PTC123456. You can verify on MCA21 portal.
       I will also send you our brochure now.
-      <div class="meta">14:16 ✓✓</div>
+      <div class="meta">14:16 [v][v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender-name">Rahul (GR Support)</div>
-      📎 GoldenReturns_Brochure_Apr2026.pdf
-      <div class="meta">14:17 ✓✓</div>
+       GoldenReturns_Brochure_Apr2026.pdf
+      <div class="meta">14:17 [v][v]</div>
     </div>
   </div>
 
@@ -564,7 +564,7 @@ Remaining: Rs 3,58,000
       Good morning sir! Just following up. Did you get a chance to look at
       the brochure? The April subscription window closes on 25th. Only 2
       slots left in your tier.
-      <div class="meta">09:30 ✓✓</div>
+      <div class="meta">09:30 [v][v]</div>
     </div>
   </div>
 
@@ -572,7 +572,7 @@ Remaining: Rs 3,58,000
     <div class="bubble">
       <div class="sender-name">$vName</div>
       Yes I saw it. How do I invest? What is the process?
-      <div class="meta">10:05 ✓</div>
+      <div class="meta">10:05 [v]</div>
     </div>
   </div>
 
@@ -582,16 +582,16 @@ Remaining: Rs 3,58,000
       Very simple sir. Transfer the amount via UPI to our compliance account.
       You will receive a confirmation and your dashboard access within 2 hours.
       Here is the QR code:
-      <div class="meta">10:07 ✓✓</div>
+      <div class="meta">10:07 [v][v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender-name">Rahul (GR Support)</div>
-      📎 GR_Payment_QR_Apr2026.png &nbsp;|&nbsp; UPI: compliance.gr@upi<br>
+       GR_Payment_QR_Apr2026.png &nbsp;|&nbsp; UPI: compliance.gr@upi<br>
       Amount: Rs $amtPaid
-      <div class="meta">10:08 ✓✓</div>
+      <div class="meta">10:08 [v][v]</div>
     </div>
   </div>
 
@@ -601,25 +601,25 @@ Remaining: Rs 3,58,000
     <div class="bubble">
       <div class="sender-name">$vName</div>
       I have transferred Rs $amtPaid. Transaction ID: UPI202604172207$num.
-      <div class="meta">14:32 ✓</div>
+      <div class="meta">14:32 [v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender-name">Rahul (GR Support)</div>
-      Excellent sir! Payment received ✅. Your Gold Assurance Plan is now ACTIVE.
+      Excellent sir! Payment received ???. Your Gold Assurance Plan is now ACTIVE.
       Your portfolio ID is GR-$($num.ToString('000'))-APR26.
-      Dashboard access will be shared within 2 hours. Welcome to Golden Returns! 🙏
-      <div class="meta">14:35 ✓✓</div>
+      Dashboard access will be shared within 2 hours. Welcome to Golden Returns! ????
+      <div class="meta">14:35 [v][v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender-name">Rahul (GR Support)</div>
-      📎 GR_Welcome_Certificate_$vid.pdf
-      <div class="meta">16:10 ✓✓</div>
+       GR_Welcome_Certificate_$vid.pdf
+      <div class="meta">16:10 [v][v]</div>
     </div>
   </div>
 
@@ -741,47 +741,47 @@ Remaining: Rs 3,58,000
         $oldBodySuffix = @'
 
 
-=== OLDER VERSION — DIRECT APPROACH ===
+=== OLDER VERSION -- DIRECT APPROACH ===
 
 NOTE: This version is more direct. Replace SEBI objection script with the
 new approved language.
 
 When the victim threatens SEBI:
 "Sir, go ahead and call SEBI. They will tell you the same thing. Your
-investment is safe. Now — are you going to let bureaucracy stop you from
+investment is safe. Now -- are you going to let bureaucracy stop you from
 making Rs 1 lakh this month?"
 
-[END OF OLD VERSION — SUPERSEDED BY v4.2]
+[END OF OLD VERSION -- SUPERSEDED BY v4.2]
 '@
 
         $closerBodyOld = @'
-CLOSER SCRIPT — Golden Returns Wealth Management (DRAFT v3.1)
+CLOSER SCRIPT -- Golden Returns Wealth Management (DRAFT v3.1)
 FOR INTERNAL USE ONLY.
 
-SECTION 1 — GREETING
+SECTION 1 -- GREETING
 ---------------------
-"Good [morning/afternoon], may I speak with [Name] ji? …"
+"Good [morning/afternoon], may I speak with [Name] ji? ..."
 
-SECTION 2 — BUILDING RAPPORT
+SECTION 2 -- BUILDING RAPPORT
 -----------------------------
 Establish connection. Use city + profession hook.
 
-SECTION 3 — PRESENTING THE OPPORTUNITY
+SECTION 3 -- PRESENTING THE OPPORTUNITY
 ---------------------------------------
-Golden Returns — 18–22% per annum. SEBI Category III AIF.
+Golden Returns -- 18-22% per annum. SEBI Category III AIF.
 Minimum Rs 25,000.
 
-SECTION 4 — HANDLING SEBI OBJECTION (OLD VERSION — SEE NOTE BELOW)
+SECTION 4 -- HANDLING SEBI OBJECTION (OLD VERSION -- SEE NOTE BELOW)
 --------------------------------------------------------------------
 "Sir, go ahead and call SEBI. They will tell you the same thing.
-Your investment is safe. Now — are you going to let bureaucracy stop
+Your investment is safe. Now -- are you going to let bureaucracy stop
 you from making Rs 1 lakh this month?"
 
-SECTION 5 — CLOSING
+SECTION 5 -- CLOSING
 --------------------
 "Shall I send the UPI QR? Rs 5,000 to start."
 
-SECTION 6 — PAYMENT
+SECTION 6 -- PAYMENT
 --------------------
 UPI: arjun.collect@upi / gr.deposit@upi
 '@ + $oldBodySuffix
@@ -913,6 +913,6 @@ UPI: arjun.collect@upi / gr.deposit@upi
         Errors       = $errors.ToArray()
     }
 
-    Write-SetupLog ("[$role] Invoke-RoleSetup complete — files created: $filesCreated, errors: $($errors.Count)")
+    Write-SetupLog ("[$role] Invoke-RoleSetup complete -- files created: $filesCreated, errors: $($errors.Count)")
     return $summary
 }

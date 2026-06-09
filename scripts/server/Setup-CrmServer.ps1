@@ -3,7 +3,7 @@
   Setup-CrmServer.ps1  --  CRM-SERVER artefact generator
   "Golden Returns Wealth Management" cyber-forensics training lab.
 
-  Role    : CRM-SERVER — XAMPP/MySQL CRM back-end
+  Role    : CRM-SERVER -- XAMPP/MySQL CRM back-end
   Hostname: CRM-SERVER
   IP      : 192.168.10.100 (static)
   OS      : Windows Server 2019 (script also works on Windows 10)
@@ -94,7 +94,7 @@ function Invoke-RoleSetup {
     $xamppInstalled = $false
     try {
         if (Test-Path "$xamppDir\mysql\bin\mysql.exe") {
-            Write-SetupLog "[$role] XAMPP already installed at $xamppDir — skipping download"
+            Write-SetupLog "[$role] XAMPP already installed at $xamppDir -- skipping download"
             $xamppInstalled = $true
         } else {
             $xamppInstaller = "$env:TEMP\xampp-installer.exe"
@@ -122,7 +122,7 @@ function Invoke-RoleSetup {
             Write-SetupLog "[$role] XAMPP installed successfully"
         }
     } catch {
-        $msg = "[$role] Step 1 WARN — XAMPP download/install failed: $($_.Exception.Message) — will create file artefacts only"
+        $msg = "[$role] Step 1 WARN -- XAMPP download/install failed: $($_.Exception.Message) -- will create file artefacts only"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
         $xamppInstalled = $false
@@ -157,17 +157,17 @@ function Invoke-RoleSetup {
                 Write-SetupLog "[$role] MySQL is alive"
                 $mysqlAvailable = $true
             } else {
-                $msg = "[$role] Step 2 WARN — MySQL did not respond within 30 s"
+                $msg = "[$role] Step 2 WARN -- MySQL did not respond within 30 s"
                 Write-SetupLog $msg 'WARN'
                 $errors.Add($msg)
             }
         } catch {
-            $msg = "[$role] Step 2 WARN — MySQL start failed: $($_.Exception.Message)"
+            $msg = "[$role] Step 2 WARN -- MySQL start failed: $($_.Exception.Message)"
             Write-SetupLog $msg 'WARN'
             $errors.Add($msg)
         }
     } else {
-        Write-SetupLog "[$role] Step 2 SKIP — XAMPP not installed; skipping MySQL start" 'WARN'
+        Write-SetupLog "[$role] Step 2 SKIP -- XAMPP not installed; skipping MySQL start" 'WARN'
     }
 
     # ==================================================================
@@ -246,13 +246,13 @@ CREATE TABLE IF NOT EXISTS users (
             Invoke-MySql -Sql $schemaSql -MysqlExe $mysql
             Write-SetupLog "[$role] golden_crm schema created"
         } catch {
-            $msg = "[$role] Step 3 WARN — schema creation failed: $($_.Exception.Message)"
+            $msg = "[$role] Step 3 WARN -- schema creation failed: $($_.Exception.Message)"
             Write-SetupLog $msg 'WARN'
             $errors.Add($msg)
             $mysqlAvailable = $false
         }
     } else {
-        Write-SetupLog "[$role] Step 3 SKIP — MySQL not available; schema will be written to fallback file" 'WARN'
+        Write-SetupLog "[$role] Step 3 SKIP -- MySQL not available; schema will be written to fallback file" 'WARN'
     }
 
     # ==================================================================
@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS users (
         }
         Write-SetupLog "[$role] Step 4a: victims inserted"
     } catch {
-        $msg = "[$role] Step 4a WARN — victims insert failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 4a WARN -- victims insert failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -356,7 +356,7 @@ CREATE TABLE IF NOT EXISTS users (
         }
         Write-SetupLog "[$role] Step 4b: leads inserted"
     } catch {
-        $msg = "[$role] Step 4b WARN — leads insert failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 4b WARN -- leads insert failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -400,7 +400,7 @@ CREATE TABLE IF NOT EXISTS users (
         }
         Write-SetupLog "[$role] Step 4c: transactions inserted"
     } catch {
-        $msg = "[$role] Step 4c WARN — transactions insert failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 4c WARN -- transactions insert failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -443,7 +443,7 @@ CREATE TABLE IF NOT EXISTS users (
         }
         Write-SetupLog "[$role] Step 4d: call_logs inserted"
     } catch {
-        $msg = "[$role] Step 4d WARN — call_logs insert failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 4d WARN -- call_logs insert failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -471,7 +471,7 @@ INSERT INTO users (username, password_hash, role) VALUES
             $fallbackSqlLines.Add('')
         }
     } catch {
-        $msg = "[$role] Step 4e WARN — users insert failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 4e WARN -- users insert failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -485,7 +485,7 @@ INSERT INTO users (username, password_hash, role) VALUES
             $fallbackSqlLines | Set-Content -Path $fallbackSqlFile -Encoding UTF8
             Add-HashRecord -FilePath $fallbackSqlFile -Role $role
             $filesCreated++
-            Write-SetupLog "[$role] MySQL population skipped — inserts saved to $fallbackSqlFile" 'WARN'
+            Write-SetupLog "[$role] MySQL population skipped -- inserts saved to $fallbackSqlFile" 'WARN'
         } catch {
             $msg = "[$role] Fallback SQL write FAILED: $($_.Exception.Message)"
             Write-SetupLog $msg 'ERROR'
@@ -556,7 +556,7 @@ USE `golden_crm`;
         }
         Write-SetupLog "[$role] Step 6 complete: SMB share '$shareName' -> $backupDir"
     } catch {
-        $msg = "[$role] Step 6 WARN — SMB share 'old' failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 6 WARN -- SMB share 'old' failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -570,7 +570,7 @@ USE `golden_crm`;
     New-DirectoryIfMissing $htdocsDir
 
     # ------------------------------------------------------------------
-    # 7a. index.php — CRM login page
+    # 7a. index.php -- CRM login page
     # ------------------------------------------------------------------
     Write-SetupLog "[$role] Step 7a: index.php"
     try {
@@ -614,7 +614,7 @@ Password: <input type="password" name="password"><br><br>
     }
 
     # ------------------------------------------------------------------
-    # 7b. dashboard.php — main dashboard
+    # 7b. dashboard.php -- main dashboard
     # ------------------------------------------------------------------
     Write-SetupLog "[$role] Step 7b: dashboard.php"
     try {
@@ -652,7 +652,7 @@ $totalAmount = $conn->query("SELECT SUM(amount_paid) as s FROM victims")->fetch_
     }
 
     # ------------------------------------------------------------------
-    # 7c. victims.php — victim list page
+    # 7c. victims.php -- victim list page
     # ------------------------------------------------------------------
     Write-SetupLog "[$role] Step 7c: victims.php"
     try {
@@ -697,7 +697,7 @@ $result = $conn->query("SELECT victim_id,name,phone,city,amount_paid,final_outco
     }
 
     # ------------------------------------------------------------------
-    # 7d. leads.php — lead pipeline page
+    # 7d. leads.php -- lead pipeline page
     # ------------------------------------------------------------------
     Write-SetupLog "[$role] Step 7d: leads.php"
     try {
@@ -741,7 +741,7 @@ $result = $conn->query("SELECT lead_id,name,phone,source,heat_score,status,assig
     }
 
     # ------------------------------------------------------------------
-    # 7e. transactions.php — transaction list page
+    # 7e. transactions.php -- transaction list page
     # ------------------------------------------------------------------
     Write-SetupLog "[$role] Step 7e: transactions.php"
     try {
@@ -785,7 +785,7 @@ $result = $conn->query("SELECT txn_id,victim_id,amount,upi_id,beneficiary_acct,t
     }
 
     # ------------------------------------------------------------------
-    # 7f. calls.php — call log page
+    # 7f. calls.php -- call log page
     # ------------------------------------------------------------------
     Write-SetupLog "[$role] Step 7f: calls.php"
     try {
@@ -849,7 +849,7 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
         }
         Write-SetupLog "[$role] Step 8 complete: firewall rules"
     } catch {
-        $msg = "[$role] Step 8 WARN — firewall rules failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 8 WARN -- firewall rules failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -864,7 +864,7 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
         Set-ItemProperty -Path $smbRegPath -Name 'EnableSecuritySignature'  -Value 0
         Write-SetupLog "[$role] Step 9 complete: SMB signing disabled"
     } catch {
-        $msg = "[$role] Step 9 WARN — SMB signing registry update failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 9 WARN -- SMB signing registry update failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
@@ -948,20 +948,20 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
             $filesCreated++
             Write-SetupLog "[$role] Copied victims_master.xlsx to $victimsDir"
         } else {
-            Write-SetupLog "[$role] victims_master.xlsx not found at $vmSource — skipping copy" 'WARN'
+            Write-SetupLog "[$role] victims_master.xlsx not found at $vmSource -- skipping copy" 'WARN'
         }
 
         # Create the SMB share (read-only).
         & net share "Victims=${victimsDir}" '/GRANT:Everyone,READ' 2>&1 | Out-Null
         Write-SetupLog "[$role] Step 11 complete: SMB share Victims -> $victimsDir"
     } catch {
-        $msg = "[$role] Step 11 WARN — Victims share failed: $($_.Exception.Message)"
+        $msg = "[$role] Step 11 WARN -- Victims share failed: $($_.Exception.Message)"
         Write-SetupLog $msg 'WARN'
         $errors.Add($msg)
     }
 
     # ==================================================================
-    # Step 12: D:\CRM\uploads\ — WAV recording stubs
+    # Step 12: D:\CRM\uploads\ -- WAV recording stubs
     # ==================================================================
     Write-SetupLog "[$role] Step 12: Call recording WAV stubs"
     try {
@@ -1000,7 +1000,7 @@ $result = $conn->query("SELECT log_id,agent_id,victim_id,duration_seconds,record
               elseif ($filesCreated -gt 0) { 'DONE_WITH_CONCERNS' }
               else { 'BLOCKED' }
 
-    Write-SetupLog "[$role] Invoke-RoleSetup finished — FilesCreated=$filesCreated Errors=$($errors.Count) Status=$status"
+    Write-SetupLog "[$role] Invoke-RoleSetup finished -- FilesCreated=$filesCreated Errors=$($errors.Count) Status=$status"
 
     return @{
         Role         = $role

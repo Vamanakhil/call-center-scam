@@ -54,10 +54,10 @@ function Write-Banner {
 }
 
 Write-Banner `
-    'Golden Returns Wealth Management — Lab Setup' `
+    'Golden Returns Wealth Management -- Lab Setup' `
     ("Role: $Role   |   Started: $($startTime.ToString('yyyy-MM-dd HH:mm:ss'))")
 
-# ---- Admin check (friendly message — #Requires handles the hard stop) --------
+# ---- Admin check (friendly message -- #Requires handles the hard stop) --------
 $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -65,7 +65,7 @@ if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
 } else {
     # Should never reach here because of #Requires -RunAsAdministrator,
     # but emit a clear message just in case the check is ever bypassed.
-    Write-Host '[WARN] Not running as Administrator — some artefacts may fail to create.' -ForegroundColor Yellow
+    Write-Host '[WARN] Not running as Administrator -- some artefacts may fail to create.' -ForegroundColor Yellow
 }
 
 # ---- Lab base directory ------------------------------------------------------
@@ -86,7 +86,7 @@ if (-not (Test-Path -LiteralPath $sharedLib)) {
 Write-Host "[OK] Loading shared library: $sharedLib" -ForegroundColor Green
 . $sharedLib   # exposes Write-SetupLog, Add-HashRecord, $VictimData, etc.
 
-# ---- Role → script file mapping ----------------------------------------------
+# ---- Role -> script file mapping ----------------------------------------------
 $roleMap = [ordered]@{
     'AGENT-01'   = Join-Path $PSScriptRoot 'agents\Setup-Agent01.ps1'
     'AGENT-02'   = Join-Path $PSScriptRoot 'agents\Setup-Agent02.ps1'

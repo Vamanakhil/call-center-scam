@@ -106,7 +106,7 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors       = [System.Collections.Generic.List[string]]::new()
 
-    Write-SetupLog "[$role] Invoke-RoleSetup starting — spool dir: $spoolDir"
+    Write-SetupLog "[$role] Invoke-RoleSetup starting -- spool dir: $spoolDir"
 
     # ------------------------------------------------------------------
     # Artefact 1: Spool directory + SMB share
@@ -120,7 +120,7 @@ function Invoke-RoleSetup {
         $shareArgs = "share `"Spool=$spoolDir`" /REMARK:`"Printer Spool`" /GRANT:Everyone,FULL"
         & cmd.exe /c "net $shareArgs 2>nul" | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            # Share already exists — delete and recreate.
+            # Share already exists -- delete and recreate.
             & cmd.exe /c "net share Spool /DELETE /YES 2>nul" | Out-Null
             & cmd.exe /c "net $shareArgs 2>nul" | Out-Null
         }
@@ -253,7 +253,7 @@ Job | Date       | Time  | User     | Document                           | Pages
     # Summary
     # ------------------------------------------------------------------
     $status = if ($errors.Count -eq 0) { 'DONE' } elseif ($errors.Count -le 2) { 'DONE_WITH_CONCERNS' } else { 'NEEDS_CONTEXT' }
-    Write-SetupLog ("[$role] Invoke-RoleSetup complete — files created: $filesCreated, errors: $($errors.Count) — status: $status")
+    Write-SetupLog ("[$role] Invoke-RoleSetup complete -- files created: $filesCreated, errors: $($errors.Count) -- status: $status")
 
     return @{
         Role         = $role

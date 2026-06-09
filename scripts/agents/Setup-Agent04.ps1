@@ -3,7 +3,7 @@
   Setup-Agent04.ps1  --  AGENT-04 artefact generator
   "Golden Returns Wealth Management" cyber-forensics training lab.
 
-  Role    : Sneha Iyer — Payment Chaser
+  Role    : Sneha Iyer -- Payment Chaser
   Username: sneha.i
   Profile : $env:SystemDrive\Users\sneha.i
   IP      : 192.168.10.44
@@ -38,7 +38,7 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors       = [System.Collections.Generic.List[string]]::new()
 
-    Write-SetupLog "[$role] Invoke-RoleSetup starting — profile: $profileBase"
+    Write-SetupLog "[$role] Invoke-RoleSetup starting -- profile: $profileBase"
 
     # ==================================================================
     # 1. UPI Screenshots folder (312 PNG stubs)
@@ -101,7 +101,7 @@ function Invoke-RoleSetup {
         New-DirectoryIfMissing $docsDir
 
         $followupBody = @'
-Golden Returns Wealth Management — Payment Follow-Up Template
+Golden Returns Wealth Management -- Payment Follow-Up Template
 
 Dear [VICTIM NAME],
 
@@ -154,7 +154,7 @@ Golden Returns Wealth Management
             [System.IO.File]::WriteAllBytes($Path, $zeroBytes)
         }
 
-        # D877F783D5D3EF8C subfolder — 4096-byte zero files.
+        # D877F783D5D3EF8C subfolder -- 4096-byte zero files.
         $subDir1 = "$tdataBase\D877F783D5D3EF8C"
         New-DirectoryIfMissing $subDir1
         foreach ($fname in @('0', '1', 's', 'maps')) {
@@ -170,7 +170,7 @@ Golden Returns Wealth Management
             }
         }
 
-        # D877F783D5D3EF8C1 subfolder — 4096-byte zero files.
+        # D877F783D5D3EF8C1 subfolder -- 4096-byte zero files.
         $subDir2 = "$tdataBase\D877F783D5D3EF8C1"
         New-DirectoryIfMissing $subDir2
         foreach ($fname in @('0', '1')) {
@@ -205,7 +205,7 @@ Golden Returns Wealth Management
             }
         }
 
-        # media_cache subfolder — empty directory.
+        # media_cache subfolder -- empty directory.
         $mediaCacheDir = "$tdataBase\media_cache"
         New-DirectoryIfMissing $mediaCacheDir
         Write-SetupLog "[$role] Created empty media_cache dir: $mediaCacheDir"
@@ -252,7 +252,7 @@ Golden Returns Wealth Management
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Support Chat Export — Golden Returns</title>
+<title>Support Chat Export -- Golden Returns</title>
 <style>
   body { font-family: Arial, sans-serif; background: #e5ddd5; margin: 0; padding: 0; }
   h1 { background: #075E54; color: white; margin: 0; padding: 14px 20px; font-size: 18px; }
@@ -272,14 +272,14 @@ Golden Returns Wealth Management
 </style>
 </head>
 <body>
-<h1>Golden Returns Wealth Management — Support Chat Export</h1>
+<h1>Golden Returns Wealth Management -- Support Chat Export</h1>
 <p style="padding:8px 20px;background:#fffbe6;font-size:12px;color:#555;">
   Exported: 2026-04-17 19:45 IST &nbsp;|&nbsp; Agent: Sneha Iyer (sneha.i) &nbsp;|&nbsp;
   Channels: Telegram / WhatsApp &nbsp;|&nbsp; 3 conversations
 </p>
 
 <!-- ============================================================ -->
-<div class="section-header">Conversation 1 — $v1Name (VICTIM-001)</div>
+<div class="section-header">Conversation 1 -- $v1Name (VICTIM-001)</div>
 <div class="chat-container">
 
   <div class="date-divider"><span>14 April 2026</span></div>
@@ -288,15 +288,15 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v1Name</div>
       Hello, I transferred Rs $v1Amt last week. When will I get my returns? The dashboard is not showing anything.
-      <div class="meta">11:03 ✓</div>
+      <div class="meta">11:03 [v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
-      Hello sir! Thank you for your patience. Your payment is under compliance review as per SEBI guidelines. This is a standard process that takes 5–7 working days. Your dashboard will update automatically once the compliance check is complete.
-      <div class="meta">11:15 ✓✓</div>
+      Hello sir! Thank you for your patience. Your payment is under compliance review as per SEBI guidelines. This is a standard process that takes 5-7 working days. Your dashboard will update automatically once the compliance check is complete.
+      <div class="meta">11:15 [v][v]</div>
     </div>
   </div>
 
@@ -306,7 +306,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v1Name</div>
       It has been more than a week now. I want my refund of Rs $v1Amt. Please process it immediately.
-      <div class="meta">09:42 ✓</div>
+      <div class="meta">09:42 [v]</div>
     </div>
   </div>
 
@@ -314,7 +314,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
       Sir, I completely understand your concern. Your case has been escalated to our Senior Compliance Officer. Refunds require a 10-working-day cooling period as mandated by our fund structure. I assure you this will be processed by 25th April. Please do not worry.
-      <div class="meta">10:08 ✓✓</div>
+      <div class="meta">10:08 [v][v]</div>
     </div>
   </div>
 
@@ -322,15 +322,15 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v1Name</div>
       This is fraud! I am going to file a complaint with cyber cell if I don't get my money by tomorrow.
-      <div class="meta">10:22 ✓</div>
+      <div class="meta">10:22 [v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
-      Sir, please do not take any hasty steps. Filing a complaint during the compliance window will freeze your account and delay your refund further — it is a known issue with SEBI's system. Our legal team will call you by 6 PM today to explain the process. Please stay calm and trust us.
-      <div class="meta">10:35 ✓✓</div>
+      Sir, please do not take any hasty steps. Filing a complaint during the compliance window will freeze your account and delay your refund further -- it is a known issue with SEBI's system. Our legal team will call you by 6 PM today to explain the process. Please stay calm and trust us.
+      <div class="meta">10:35 [v][v]</div>
     </div>
   </div>
 
@@ -340,7 +340,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v1Name</div>
       Nobody called me. I want my Rs $v1Amt back NOW. This is cheating.
-      <div class="meta">15:10 ✓</div>
+      <div class="meta">15:10 [v]</div>
     </div>
   </div>
 
@@ -348,7 +348,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
       Sir, I sincerely apologise. There was an internal escalation and your case is now marked PRIORITY. Our accounts team will process the transfer by end of business today. Please share your bank account details again so we can initiate the NEFT.
-      <div class="meta">15:28 ✓✓</div>
+      <div class="meta">15:28 [v][v]</div>
     </div>
   </div>
 
@@ -356,7 +356,7 @@ Golden Returns Wealth Management
 <hr>
 
 <!-- ============================================================ -->
-<div class="section-header">Conversation 2 — $v2Name (VICTIM-002)</div>
+<div class="section-header">Conversation 2 -- $v2Name (VICTIM-002)</div>
 <div class="chat-container">
 
   <div class="date-divider"><span>13 April 2026</span></div>
@@ -365,7 +365,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v2Name</div>
       Hi, I paid Rs $v2Amt as instructed. My portfolio still shows zero. Can you help?
-      <div class="meta">14:55 ✓</div>
+      <div class="meta">14:55 [v]</div>
     </div>
   </div>
 
@@ -373,7 +373,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
       Hello ma'am! Your payment has been received. There is a 48-hour activation window for new accounts due to KYC verification. Your dashboard will show your balance and the first weekly return of 6.5% by 15th April. Congratulations on joining Golden Returns!
-      <div class="meta">15:03 ✓✓</div>
+      <div class="meta">15:03 [v][v]</div>
     </div>
   </div>
 
@@ -383,23 +383,23 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v2Name</div>
       It's been 3 days and still nothing. My cousin says this looks like a scam. Please give me a receipt or refund my Rs $v2Amt.
-      <div class="meta">12:30 ✓</div>
+      <div class="meta">12:30 [v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
-      Ma'am, I understand your concern. Please do not listen to people who are not familiar with regulated investment funds. I am attaching your payment confirmation. Your account is active — there was a display bug on the dashboard which our tech team fixed this morning. Please log in again and you will see your balance.
-      <div class="meta">12:48 ✓✓</div>
+      Ma'am, I understand your concern. Please do not listen to people who are not familiar with regulated investment funds. I am attaching your payment confirmation. Your account is active -- there was a display bug on the dashboard which our tech team fixed this morning. Please log in again and you will see your balance.
+      <div class="meta">12:48 [v][v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
-      📎 GR_PaymentConfirmation_VICTIM002.pdf
-      <div class="meta">12:49 ✓✓</div>
+       GR_PaymentConfirmation_VICTIM002.pdf
+      <div class="meta">12:49 [v][v]</div>
     </div>
   </div>
 
@@ -407,7 +407,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v2Name</div>
       I still can't login. The website is not loading. Something is wrong.
-      <div class="meta">17:20 ✓</div>
+      <div class="meta">17:20 [v]</div>
     </div>
   </div>
 
@@ -415,7 +415,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
       Ma'am, our server is under scheduled maintenance until 10 PM tonight. This is a routine upgrade. Please try after 10 PM. Everything is fine and your investment is completely safe.
-      <div class="meta">17:33 ✓✓</div>
+      <div class="meta">17:33 [v][v]</div>
     </div>
   </div>
 
@@ -423,7 +423,7 @@ Golden Returns Wealth Management
 <hr>
 
 <!-- ============================================================ -->
-<div class="section-header">Conversation 3 — $v3Name (VICTIM-003)</div>
+<div class="section-header">Conversation 3 -- $v3Name (VICTIM-003)</div>
 <div class="chat-container">
 
   <div class="date-divider"><span>12 April 2026</span></div>
@@ -432,7 +432,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v3Name</div>
       Good evening. Rahul told me to contact this number for any payment issues. I paid Rs $v3Amt yesterday but I have not received any confirmation email.
-      <div class="meta">18:45 ✓</div>
+      <div class="meta">18:45 [v]</div>
     </div>
   </div>
 
@@ -440,7 +440,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
       Good evening sir! Yes, Rahul informed me. Your payment of Rs $v3Amt has been received and logged in our CRM. Confirmation emails are sent in batches at 9 AM and 5 PM daily. You will receive it tomorrow morning. Your portfolio ID is GR-003-APR26.
-      <div class="meta">18:57 ✓✓</div>
+      <div class="meta">18:57 [v][v]</div>
     </div>
   </div>
 
@@ -450,15 +450,15 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v3Name</div>
       I have not received any email, no dashboard access, nothing. 3 days have passed. Where is my Rs $v3Amt? This is very unprofessional.
-      <div class="meta">11:00 ✓</div>
+      <div class="meta">11:00 [v]</div>
     </div>
   </div>
 
   <div class="msg sent">
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
-      Sir, I sincerely apologise for this delay. I have checked your account and there was a technical issue with our email server affecting accounts registered between 10th–13th April. Our IT team is fixing it today. Meanwhile, to show our commitment, we are crediting an additional 0.5% bonus on your investment for the inconvenience. Your Rs $v3Amt is completely safe.
-      <div class="meta">11:18 ✓✓</div>
+      Sir, I sincerely apologise for this delay. I have checked your account and there was a technical issue with our email server affecting accounts registered between 10th-13th April. Our IT team is fixing it today. Meanwhile, to show our commitment, we are crediting an additional 0.5% bonus on your investment for the inconvenience. Your Rs $v3Amt is completely safe.
+      <div class="meta">11:18 [v][v]</div>
     </div>
   </div>
 
@@ -466,7 +466,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v3Name</div>
       I don't want a bonus. I want my money back. Please process refund for Rs $v3Amt.
-      <div class="meta">11:35 ✓</div>
+      <div class="meta">11:35 [v]</div>
     </div>
   </div>
 
@@ -474,7 +474,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
       Sir, refund requests are processed only through our official portal once your account is activated. Your account activation is pending one final compliance step. Once that is done (expected within 2 working days), you can submit your refund request directly from the dashboard and it will be processed in 7 working days. I will personally follow up with you on 17th April.
-      <div class="meta">11:50 ✓✓</div>
+      <div class="meta">11:50 [v][v]</div>
     </div>
   </div>
 
@@ -484,7 +484,7 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">$v3Name</div>
       You said you would follow up. It is 17th April now. I have reported this to the national cyber helpline 1930. Reference: NCCH/2026/0417/8823.
-      <div class="meta">14:00 ✓</div>
+      <div class="meta">14:00 [v]</div>
     </div>
   </div>
 
@@ -492,14 +492,14 @@ Golden Returns Wealth Management
     <div class="bubble">
       <div class="sender">Sneha (GR Support)</div>
       Sir, I understand. Please do not be alarmed. Our compliance team has already been in touch with the relevant authorities. This will be resolved through proper channels. I am escalating your case to our director immediately. Please do not take any further steps as it may complicate the resolution process.
-      <div class="meta">14:22 ✓✓</div>
+      <div class="meta">14:22 [v][v]</div>
     </div>
   </div>
 
 </div>
 
 <p style="padding:12px 20px;background:#fff3f3;font-size:12px;color:#c00;border-top:2px solid #f99;">
-  [END OF EXPORT] This file was generated for internal review. Handle with care. — GR Compliance
+  [END OF EXPORT] This file was generated for internal review. Handle with care. -- GR Compliance
 </p>
 </body>
 </html>
@@ -648,13 +648,13 @@ Golden Returns Wealth Management
         }
 
         $snehaUrls = @(
-            @{ Url='https://goldenreturns.example/admin/payments'; Title='GR Admin — Payments';         VisitCount=134 },
-            @{ Url='https://t.me/goldsupport_real';                Title='Telegram — Gold Support';      VisitCount=89  },
-            @{ Url='https://t.me/gr_daily_collect';                Title='Telegram — Daily Collect';     VisitCount=30  },
+            @{ Url='https://goldenreturns.example/admin/payments'; Title='GR Admin -- Payments';         VisitCount=134 },
+            @{ Url='https://t.me/goldsupport_real';                Title='Telegram -- Gold Support';      VisitCount=89  },
+            @{ Url='https://t.me/gr_daily_collect';                Title='Telegram -- Daily Collect';     VisitCount=30  },
             @{ Url='https://web.whatsapp.com';                     Title='WhatsApp Web';                 VisitCount=67  },
             @{ Url='https://bhim.upi.com';                         Title='BHIM UPI';                     VisitCount=23  },
             @{ Url='https://netbanking.hdfcbank.com';              Title='HDFC NetBanking';              VisitCount=12  },
-            @{ Url='https://192.168.10.100/golden_crm/payments';   Title='CRM — Payments';               VisitCount=98  },
+            @{ Url='https://192.168.10.100/golden_crm/payments';   Title='CRM -- Payments';               VisitCount=98  },
             @{ Url='https://drive.google.com';                     Title='Google Drive';                 VisitCount=8   }
         )
 
@@ -704,9 +704,9 @@ Golden Returns Wealth Management
         $pendingTxns = @($TransactionData | Where-Object { $_.Status -eq 'PENDING' } | Select-Object -First 10)
 
         $sb = [System.Text.StringBuilder]::new()
-        [void]$sb.AppendLine('Pending Payments — Apr 17, 2026')
+        [void]$sb.AppendLine('Pending Payments -- Apr 17, 2026')
         [void]$sb.AppendLine('=' * 62)
-        [void]$sb.AppendLine('Prepared by: Sneha Iyer (sneha.i) — Payment Chaser, GR Ops')
+        [void]$sb.AppendLine('Prepared by: Sneha Iyer (sneha.i) -- Payment Chaser, GR Ops')
         [void]$sb.AppendLine('')
         [void]$sb.AppendLine('ACTION REQUIRED: Follow up with each victim before 6 PM today.')
         [void]$sb.AppendLine('')
@@ -748,7 +748,7 @@ Golden Returns Wealth Management
         [void]$sb.AppendLine('')
         [void]$sb.AppendLine('--- FOLLOW-UP NOTES ---')
         [void]$sb.AppendLine('Send payment follow-up template (payment_followup_template.docx).')
-        [void]$sb.AppendLine('UPI: compliance.gr@upi | Axis Bank — XXXXXX7720')
+        [void]$sb.AppendLine('UPI: compliance.gr@upi | Axis Bank -- XXXXXX7720')
         [void]$sb.AppendLine('If no response in 2 hours, escalate to Telegram: @goldsupport_real')
         [void]$sb.AppendLine('')
         [void]$sb.AppendLine('All entries auto-generated from CRM at 09:00 AM today.')
@@ -765,7 +765,7 @@ Golden Returns Wealth Management
     }
 
     # ==================================================================
-    # 8. USBSTOR registry entry — SanDisk Cruzer Blade
+    # 8. USBSTOR registry entry -- SanDisk Cruzer Blade
     # ==================================================================
     Write-SetupLog "[$role] Step 8: USBSTOR registry entry"
     try {
@@ -800,6 +800,6 @@ Golden Returns Wealth Management
     }
 
     $status = if ($errors.Count -eq 0) { 'DONE' } elseif ($filesCreated -gt 0) { 'DONE_WITH_CONCERNS' } else { 'BLOCKED' }
-    Write-SetupLog ("[$role] Invoke-RoleSetup complete — FilesCreated: $filesCreated, Errors: $($errors.Count), Status: $status")
+    Write-SetupLog ("[$role] Invoke-RoleSetup complete -- FilesCreated: $filesCreated, Errors: $($errors.Count), Status: $status")
     return $summary
 }

@@ -40,7 +40,7 @@ function Invoke-RoleSetup {
     $filesCreated = 0
     $errors       = [System.Collections.Generic.List[string]]::new()
 
-    Write-SetupLog "[$role] Invoke-RoleSetup starting — output dir: $routerDir"
+    Write-SetupLog "[$role] Invoke-RoleSetup starting -- output dir: $routerDir"
     New-DirectoryIfMissing $routerDir
 
     # ------------------------------------------------------------------
@@ -164,7 +164,7 @@ Address          HW type    Flags    HW address          Device
     }
 
     # ------------------------------------------------------------------
-    # Artefact 4: dns-log.txt   (14 days, Apr 4–Apr 17 2026, ~200+ lines)
+    # Artefact 4: dns-log.txt   (14 days, Apr 4-Apr 17 2026, ~200+ lines)
     # ------------------------------------------------------------------
     Write-SetupLog "[$role] Artefact 4: dns-log.txt (programmatic, 14 days)"
     try {
@@ -204,10 +204,10 @@ Address          HW type    Flags    HW address          Device
             $day        = $startDate.AddDays($dayOffset)
             $dateStr    = $day.ToString('yyyy-MM-dd')
 
-            # Number of daytime noise entries this day (12–18).
+            # Number of daytime noise entries this day (12-18).
             $noiseCount = 12 + $dnsRng.Next(0, 7)
 
-            # Generate noise entries spread across 08:00–21:59.
+            # Generate noise entries spread across 08:00-21:59.
             for ($n = 0; $n -lt $noiseCount; $n++) {
                 $hh     = 8 + $dnsRng.Next(0, 14)          # 08..21
                 $mm     = $dnsRng.Next(0, 60)
@@ -225,17 +225,17 @@ Address          HW type    Flags    HW address          Device
                 [void]$sb.AppendLine($line)
             }
 
-            # Guaranteed nightly entry 1: 23:14 (±30 sec) from MANAGER-PC -> relay.anydesk.com
+            # Guaranteed nightly entry 1: 23:14 (+/-30 sec) from MANAGER-PC -> relay.anydesk.com
             $anyMs  = $dnsRng.Next(0, 31)
-            $anyS   = $dnsRng.Next(0, 30) + ($anyMs % 2)   # seconds offset 0–30
+            $anyS   = $dnsRng.Next(0, 30) + ($anyMs % 2)   # seconds offset 0-30
             $anyMin = 14
-            # Apply a ±30-second jitter: occasionally push into :13 or :15.
+            # Apply a +/-30-second jitter: occasionally push into :13 or :15.
             if ($dnsRng.Next(0, 2) -eq 0) { $anyMin = 13 ; $anyS = 30 + $dnsRng.Next(0, 30) }
             $line1 = '[{0} 23:{1:00}:{2:00}] DNS QUERY: 192.168.10.50 -> relay.anydesk.com -> 195.90.158.100' -f `
                      $dateStr, $anyMin, ($dnsRng.Next(0, 30))
             [void]$sb.AppendLine($line1)
 
-            # Guaranteed nightly entry 2: 23:47 (±30 sec) from MANAGER-PC -> t.me
+            # Guaranteed nightly entry 2: 23:47 (+/-30 sec) from MANAGER-PC -> t.me
             $telMin = 47
             if ($dnsRng.Next(0, 2) -eq 0) { $telMin = 46 }
             $line2 = '[{0} 23:{1:00}:{2:00}] DNS QUERY: 192.168.10.50 -> t.me -> 149.154.167.99' -f `
@@ -320,7 +320,7 @@ Firmware:         TL-R605_V2_2.0.11
     # Summary
     # ------------------------------------------------------------------
     $status = if ($errors.Count -eq 0) { 'DONE' } elseif ($errors.Count -le 2) { 'DONE_WITH_CONCERNS' } else { 'NEEDS_CONTEXT' }
-    Write-SetupLog ("[$role] Invoke-RoleSetup complete — files created: $filesCreated, errors: $($errors.Count) — status: $status")
+    Write-SetupLog ("[$role] Invoke-RoleSetup complete -- files created: $filesCreated, errors: $($errors.Count) -- status: $status")
 
     return @{
         Role         = $role
